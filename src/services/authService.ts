@@ -3,6 +3,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
   sendPasswordResetEmail,
+  deleteUser,
   onAuthStateChanged,
   User,
 } from 'firebase/auth';
@@ -10,6 +11,7 @@ import {
   doc,
   setDoc,
   getDoc,
+  deleteDoc,
   collection,
   query,
   where,
@@ -139,5 +141,37 @@ export const AuthService = {
 
   async updateUserRole(uid: string, role: UserRole): Promise<void> {
     await setDoc(doc(db, 'users', uid), { role }, { merge: true });
+  },
+
+  // Получить список всех пользователей хозяйства
+  async getFarmUsers(farmId: string): Promise<UserProfile[]> {
+    if (!farmId) return [];
+    try {
+      const q = query(collection(db, 'users'), where('farmId', '==', farmId));
+      const snap = await getDocs(q);
+      const list: UserProfile[] = [];
+      snap.forEach((d) => list.push(d.data() as UserProfile));
+      return list;
+    } catch (e) {
+      console.error('Ошибка получения пользователей фермы:', e);
+      return [];
+    }
+  },
+
+  // Удалить пользователя из хозяйства (удаляет документ из базы)
+  async removeUserFromFarm(uid: string): Promise<void> {
+    await deleteDoc(doc(db, 'users', uid));
+  },
+
+  // Полное удаление своего аккаунта из базы и из Firebase Auth (освобождает email для повторной регистрации)
+  async deleteCurrentAccount(): Promise<void> {
+    const user = auth.currentUser;
+    if (user) {
+      const uid = user.uid;
+      // 1. Удаляем профиль пользователя из Firestore
+      await deleteDoc(doc(db, 'users', uid)).catch(() => {});
+      // 2. Удаляем аккаунт из Firebase Auth
+      await deleteUser(user);
+    }
   },
 };

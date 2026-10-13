@@ -12,6 +12,7 @@ interface AuthContextType {
   reloadProfile: () => Promise<void>;
   changeRole: (role: UserRole) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  deleteCurrentAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -84,6 +85,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await AuthService.resetPassword(userEmail);
   };
 
+  const deleteCurrentAccount = async () => {
+    await AuthService.deleteCurrentAccount();
+    setUser(null);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -96,6 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         reloadProfile,
         changeRole,
         resetPassword,
+        deleteCurrentAccount,
       }}
     >
       {children}

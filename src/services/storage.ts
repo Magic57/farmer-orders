@@ -94,6 +94,31 @@ export const StorageService = {
     );
   },
 
+  // Подписка на всех участников данного хозяйства (для роли диспетчер)
+  subscribeFarmUsers(farmId: string, callback: (users: any[]) => void) {
+    if (!farmId) {
+      callback([]);
+      return () => {};
+    }
+    const q = query(collection(db, 'users'), where('farmId', '==', farmId));
+    return onSnapshot(
+      q,
+      (snap) => {
+        const list: any[] = [];
+        snap.forEach((d) => list.push(d.data()));
+        callback(list);
+      },
+      (err) => {
+        console.error('Ошибка подписки на пользователей хозяйства:', err);
+      }
+    );
+  },
+
+  // Удалить пользователя из хозяйства (документ из Firestore)
+  async deleteUserAccount(uid: string): Promise<void> {
+    await deleteDoc(doc(db, 'users', uid));
+  },
+
   // === ОПЕРАЦИИ С ТОВАРАМИ ===
   async getProducts(): Promise<Product[]> {
     try {
