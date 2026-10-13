@@ -30,17 +30,27 @@ jobs:
       - name: 🛠️ Генерация нативного Android проекта (Expo Prebuild)
         run: npx expo prebuild --platform android --clean
 
+      - name: 📦 Предварительная упаковка JS-бандла и ассетов
+        run: |
+          mkdir -p android/app/src/main/assets
+          npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res/
+
       - name: 🔑 Выдача прав на выполнение Gradle
         run: chmod +x android/gradlew
 
-      - name: 🚀 Сборка APK (Debug)
+      - name: 🚀 Сборка автономного APK
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon || ./gradlew assembleDebug -PreactNativeDevServerPort=8081 --no-daemon
+
+      - name: 🔍 Поиск и сохранение APK
+        run: |
+          mkdir -p output-apk
+          find android/app/build/outputs/apk -name "*.apk" -exec cp {} output-apk/ \;
 
       - name: 📤 Загрузка готового APK в артефакты
         uses: actions/upload-artifact@v4
         with:
-          name: farmer-orders-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: farmer-orders-apk
+          path: output-apk/*.apk
           retention-days: 14
