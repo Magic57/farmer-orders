@@ -189,6 +189,12 @@ export const OrderHistoryScreen = () => {
                   </Text>
                 ) : null}
 
+                {item.comment ? (
+                  <Text style={styles.commentText} numberOfLines={2}>
+                    💬 {item.comment}
+                  </Text>
+                ) : null}
+
                 <View style={styles.cardBottom}>
                   <Text style={styles.itemsCount}>Позиций: {item.items.length}</Text>
                   <Text style={styles.amount}>{item.totalAmount.toFixed(2)} ₽</Text>
@@ -342,6 +348,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: theme.colors.textMuted,
     marginBottom: 8,
+  },
+  commentText: {
+    fontSize: 13,
+    color: '#5D4037',
+    backgroundColor: '#FFFDE7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: theme.radius.sm,
+    marginBottom: 8,
+    fontStyle: 'italic',
   },
   cardBottom: {
     flexDirection: 'row',

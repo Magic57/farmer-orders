@@ -230,6 +230,14 @@ export const DeliveryTodayScreen = () => {
                     </Text>
                   </View>
 
+                  {/* Опциональный комментарий к заказу */}
+                  {item.comment ? (
+                    <View style={styles.driverCommentBox}>
+                      <Text style={styles.driverCommentLabel}>💬 Комментарий:</Text>
+                      <Text style={styles.driverCommentText}>{item.comment}</Text>
+                    </View>
+                  ) : null}
+
                   {/* Огромная кнопка ДОСТАВЛЕНО */}
                   <TouchableOpacity
                     style={styles.driverCompleteBtn}
@@ -273,6 +281,10 @@ export const DeliveryTodayScreen = () => {
 
                   {item.deliveryAddress ? (
                     <Text style={styles.address}>📍 {item.deliveryAddress}</Text>
+                  ) : null}
+
+                  {item.comment ? (
+                    <Text style={styles.commentText}>💬 {item.comment}</Text>
                   ) : null}
 
                   <View style={styles.itemsSummary}>
@@ -891,5 +903,36 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '900',
     letterSpacing: 1,
+  },
+  driverCommentBox: {
+    backgroundColor: '#FFFDE7',
+    borderWidth: 1,
+    borderColor: '#FFF59D',
+    borderRadius: theme.radius.sm,
+    padding: 12,
+    marginBottom: 14,
+  },
+  driverCommentLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8D6E63',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  driverCommentText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#3E2723',
+    lineHeight: 20,
+  },
+  commentText: {
+    fontSize: 13,
+    color: '#5D4037',
+    backgroundColor: '#FFFDE7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: theme.radius.sm,
+    marginBottom: 6,
+    fontStyle: 'italic',
   },
 });

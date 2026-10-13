@@ -50,6 +50,7 @@ export interface Order {
   customerPhone: string;
   deliveryAddress: string;
   deliveryDate?: string;
+  comment?: string;
   items: OrderItem[];
   totalAmount: number;
   status: OrderStatus;

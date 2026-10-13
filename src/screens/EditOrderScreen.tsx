@@ -29,6 +29,7 @@ export const EditOrderScreen = () => {
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
+  const [comment, setComment] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [catalog, setCatalog] = useState<Product[]>([]);
@@ -56,6 +57,7 @@ export const EditOrderScreen = () => {
       setCustomerPhone(data.customerPhone);
       setDeliveryAddress(data.deliveryAddress);
       setDeliveryDate(data.deliveryDate || '');
+      setComment(data.comment || '');
       setItems(data.items);
     }
   };
@@ -179,6 +181,7 @@ export const EditOrderScreen = () => {
         customerPhone: customerPhone.trim(),
         deliveryAddress: deliveryAddress.trim(),
         deliveryDate: deliveryDate || undefined,
+        comment: comment.trim() || undefined,
         items,
         totalAmount: parseFloat(totalOrderAmount.toFixed(2)),
         status: order?.status || 'formed',
@@ -305,6 +308,15 @@ export const EditOrderScreen = () => {
           {formatDisplayDate(deliveryDate)}
         </Text>
       </TouchableOpacity>
+
+      {/* Опциональное поле комментария к заказу */}
+      <TextInput
+        style={[styles.input, { minHeight: 46 }]}
+        placeholder="Комментарий к заказу (опционально, напр: подъезд 2, домофон 45)"
+        value={comment}
+        onChangeText={setComment}
+        multiline
+      />
 
       <View style={styles.itemsHeader}>
         <Text style={styles.sectionTitle}>Позиции в заказе ({items.length})</Text>

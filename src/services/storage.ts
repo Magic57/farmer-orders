@@ -82,7 +82,17 @@ export const StorageService = {
       q,
       (snap) => {
         const list: Customer[] = [];
-        snap.forEach((d) => list.push(d.data() as Customer));
+        snap.forEach((d) => {
+          const data: any = d.data();
+          list.push({
+            id: data.id || d.id,
+            name: data.name || '',
+            phone: data.phone || '',
+            address: data.address || data.defaultAddress || '',
+            createdAt: data.createdAt || 0,
+            farmId: data.farmId || '',
+          });
+        });
         list.sort((a, b) => b.createdAt - a.createdAt);
         AsyncStorage.setItem(CUSTOMERS_KEY, JSON.stringify(list));
         callback(list);
@@ -245,6 +255,7 @@ export const StorageService = {
       };
       if (order.deliveryAddress) orderToSave.deliveryAddress = order.deliveryAddress;
       if (order.deliveryDate) orderToSave.deliveryDate = order.deliveryDate;
+      if (order.comment) orderToSave.comment = order.comment;
       if (order.completedAt) orderToSave.completedAt = order.completedAt;
 
       if (targetFarmId) {
@@ -281,7 +292,16 @@ export const StorageService = {
   async getCustomers(): Promise<Customer[]> {
     try {
       const data = await AsyncStorage.getItem(CUSTOMERS_KEY);
-      return data ? JSON.parse(data) : [];
+      if (!data) return [];
+      const list: any[] = JSON.parse(data);
+      return list.map((c) => ({
+        id: c.id,
+        name: c.name || '',
+        phone: c.phone || '',
+        address: c.address || c.defaultAddress || '',
+        createdAt: c.createdAt || 0,
+        farmId: c.farmId || '',
+      }));
     } catch (e) {
       return [];
     }
@@ -303,12 +323,14 @@ export const StorageService = {
       );
 
       const targetId = found ? found.id : customer.id;
+      // Если передан новый адрес — берем его, иначе если был старый — сохраняем старый
+      const addressToSave = (customer.address || (customer as any).defaultAddress || found?.address || '').trim();
 
       const custToSave: Customer = {
         id: targetId,
         name: customer.name.trim(),
-        phone: (customer.phone || '').trim(),
-        address: (customer.address || (customer as any).defaultAddress || '').trim(),
+        phone: (customer.phone || found?.phone || '').trim(),
+        address: addressToSave,
         farmId: targetFarmId,
         createdAt: found?.createdAt || customer.createdAt || Date.now(),
       };
