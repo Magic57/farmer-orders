@@ -9,10 +9,11 @@ import {
   Alert,
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { Order, OrderItem, Product } from '../types';
+import { Order, OrderItem, Product, Customer } from '../types';
 import { StorageService } from '../services/storage';
 import { OrderItemCard } from '../components/OrderItemCard';
 import { SelectProductModal } from '../components/SelectProductModal';
+import { SelectCustomerModal } from '../components/SelectCustomerModal';
 import { theme } from '../constants/theme';
 
 export const EditOrderScreen = () => {
@@ -26,12 +27,15 @@ export const EditOrderScreen = () => {
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [items, setItems] = useState<OrderItem[]>([]);
   const [catalog, setCatalog] = useState<Product[]>([]);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [productModalVisible, setProductModalVisible] = useState(false);
+  const [customerModalVisible, setCustomerModalVisible] = useState(false);
 
   useEffect(() => {
     loadOrder();
     loadCatalog();
-  }, [orderId]);
+    loadCustomers();
+  }, [orderId, productModalVisible, customerModalVisible]);
 
   const loadOrder = async () => {
     if (!orderId) return;
@@ -48,6 +52,40 @@ export const EditOrderScreen = () => {
   const loadCatalog = async () => {
     const products = await StorageService.getProducts();
     setCatalog(products);
+  };
+
+  const loadCustomers = async () => {
+    const list = await StorageService.getCustomers();
+    setCustomers(list);
+  };
+
+  const handleSelectCustomer = (customer: Customer) => {
+    setCustomerName(customer.name);
+    setCustomerPhone(customer.phone);
+    setDeliveryAddress(customer.address);
+  };
+
+  const handleSaveCustomer = async (updated: Customer) => {
+    await StorageService.saveCustomer(updated);
+    loadCustomers();
+    if (customerName === updated.name) {
+      setCustomerPhone(updated.phone);
+      setDeliveryAddress(updated.address);
+    }
+  };
+
+  const handleDeleteCustomer = async (id: string) => {
+    Alert.alert('Удаление', 'Удалить этого заказчика из списка постоянных?', [
+      { text: 'Отмена', style: 'cancel' },
+      {
+        text: 'Удалить',
+        style: 'destructive',
+        onPress: async () => {
+          await StorageService.deleteCustomer(id);
+          loadCustomers();
+        },
+      },
+    ]);
   };
 
   const handleAddProduct = (product: Product) => {
@@ -100,6 +138,16 @@ export const EditOrderScreen = () => {
       return;
     }
 
+    // Сохраняем/обновляем в постоянных клиентах
+    const customerToSave: Customer = {
+      id: Date.now().toString(),
+      name: customerName.trim(),
+      phone: customerPhone.trim(),
+      address: deliveryAddress.trim(),
+      createdAt: Date.now(),
+    };
+    await StorageService.saveCustomer(customerToSave);
+
     const updatedOrder: Order = {
       id: orderId,
       customerName: customerName.trim(),
@@ -107,6 +155,7 @@ export const EditOrderScreen = () => {
       deliveryAddress: deliveryAddress.trim(),
       items,
       totalAmount: parseFloat(totalOrderAmount.toFixed(2)),
+      status: order?.status || 'formed',
       createdAt: order?.createdAt || Date.now(),
     };
 
@@ -138,9 +187,57 @@ export const EditOrderScreen = () => {
     );
   }
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.sectionTitle}>Контакты</Text>
+      <View style={styles.statusSection}>
+        <Text style={styles.statusLabel}>Статус заказа:</Text>
+        <View style={styles.statusRow}>
+          <TouchableOpacity
+            style={[styles.statusBtn, (order?.status || 'formed') === 'formed' && styles.statusBtnActiveFormed]}
+            onPress={async () => {
+              await StorageService.updateOrderStatus(orderId, 'formed');
+              setOrder((prev) => prev ? { ...prev, status: 'formed' } : null);
+            }}
+          >
+            <Text style={[styles.statusBtnText, (order?.status || 'formed') === 'formed' && styles.statusBtnTextActive]}>
+              Сформирован
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.statusBtn, order?.status === 'in_progress' && styles.statusBtnActiveProgress]}
+            onPress={async () => {
+              await StorageService.updateOrderStatus(orderId, 'in_progress');
+              setOrder((prev) => prev ? { ...prev, status: 'in_progress' } : null);
+            }}
+          >
+            <Text style={[styles.statusBtnText, order?.status === 'in_progress' && styles.statusBtnTextActive]}>
+              В работе
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.statusBtn, order?.status === 'completed' && styles.statusBtnActiveCompleted]}
+            onPress={async () => {
+              await StorageService.updateOrderStatus(orderId, 'completed');
+              setOrder((prev) => prev ? { ...prev, status: 'completed' } : null);
+            }}
+          >
+            <Text style={[styles.statusBtnText, order?.status === 'completed' && styles.statusBtnTextActive]}>
+              Завершен
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.customerHeader}>
+        <Text style={styles.sectionTitle}>Контакты заказчика</Text>
+        <TouchableOpacity
+          style={styles.chooseCustomerBtn}
+          onPress={() => setCustomerModalVisible(true)}
+        >
+          <Text style={styles.chooseCustomerBtnText}>👥 Выбрать из списка</Text>
+        </TouchableOpacity>
+      </View>
+
       <TextInput
         style={styles.input}
         placeholder="Имя заказчика *"
@@ -165,7 +262,7 @@ export const EditOrderScreen = () => {
         <Text style={styles.sectionTitle}>Позиции в корзине</Text>
         <TouchableOpacity
           style={styles.addBtn}
-          onPress={() => setModalVisible(true)}
+          onPress={() => setProductModalVisible(true)}
         >
           <Text style={styles.addBtnText}>+ Добавить товар</Text>
         </TouchableOpacity>
@@ -194,10 +291,19 @@ export const EditOrderScreen = () => {
       </TouchableOpacity>
 
       <SelectProductModal
-        visible={modalVisible}
+        visible={productModalVisible}
         products={catalog}
         onSelect={handleAddProduct}
-        onClose={() => setModalVisible(false)}
+        onClose={() => setProductModalVisible(false)}
+      />
+
+      <SelectCustomerModal
+        visible={customerModalVisible}
+        customers={customers}
+        onSelect={handleSelectCustomer}
+        onSaveCustomer={handleSaveCustomer}
+        onDeleteCustomer={handleDeleteCustomer}
+        onClose={() => setCustomerModalVisible(false)}
       />
     </ScrollView>
   );
@@ -216,12 +322,30 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
     paddingBottom: 40,
   },
+  customerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+    marginTop: 8,
+  },
+  chooseCustomerBtn: {
+    backgroundColor: '#F3E9D2',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  chooseCustomerBtnText: {
+    fontSize: 13,
+    color: theme.colors.primary,
+    fontWeight: '600',
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: theme.colors.primary,
-    marginBottom: 8,
-    marginTop: 8,
   },
   input: {
     backgroundColor: theme.colors.cardBg,
@@ -291,5 +415,48 @@ const styles = StyleSheet.create({
   deleteBtnText: {
     color: theme.colors.danger,
     fontWeight: '600',
+  },
+  statusSection: {
+    backgroundColor: theme.colors.cardBg,
+    padding: 12,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginBottom: 8,
+  },
+  statusLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.textMain,
+    marginBottom: 8,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  statusBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: theme.radius.sm,
+    backgroundColor: '#F0ECE1',
+    alignItems: 'center',
+    marginHorizontal: 3,
+  },
+  statusBtnActiveFormed: {
+    backgroundColor: '#3A5A9F',
+  },
+  statusBtnActiveProgress: {
+    backgroundColor: '#D47A22',
+  },
+  statusBtnActiveCompleted: {
+    backgroundColor: '#2D6A4F',
+  },
+  statusBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.textMain,
+  },
+  statusBtnTextActive: {
+    color: theme.colors.white,
   },
 });

@@ -9,12 +9,14 @@ import {
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Product, RootStackParamList } from '../types';
 import { StorageService } from '../services/storage';
 import { ProductCard } from '../components/ProductCard';
 import { theme } from '../constants/theme';
 
 export const ProductsScreen = () => {
+  const insets = useSafeAreaInsets();
   const [products, setProducts] = useState<Product[]>([]);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
@@ -30,8 +32,8 @@ export const ProductsScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <View style={styles.container}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) + 8 }]}>
         <Text style={styles.title}>Каталог товаров</Text>
         <TouchableOpacity
           style={styles.addBtn}

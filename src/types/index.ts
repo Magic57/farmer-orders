@@ -1,5 +1,7 @@
 export type UnitType = 'piece' | 'kg';
 
+export type OrderStatus = 'formed' | 'in_progress' | 'completed';
+
 export interface Product {
   id: string;
   name: string;
@@ -26,6 +28,16 @@ export interface Order {
   deliveryAddress: string;
   items: OrderItem[];
   totalAmount: number;
+  status: OrderStatus;
+  createdAt: number;
+  completedAt?: number;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
   createdAt: number;
 }
 
@@ -38,5 +50,6 @@ export type RootStackParamList = {
 export type MainTabParamList = {
   Products: undefined;
   NewOrder: undefined;
+  DeliveryToday: undefined;
   OrderHistory: undefined;
 };

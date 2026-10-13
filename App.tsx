@@ -9,6 +9,7 @@ import { RootStackParamList, MainTabParamList } from './src/types';
 import { ProductsScreen } from './src/screens/ProductsScreen';
 import { EditProductScreen } from './src/screens/EditProductScreen';
 import { NewOrderScreen } from './src/screens/NewOrderScreen';
+import { DeliveryTodayScreen } from './src/screens/DeliveryTodayScreen';
 import { EditOrderScreen } from './src/screens/EditOrderScreen';
 import { OrderHistoryScreen } from './src/screens/OrderHistoryScreen';
 import { theme } from './src/constants/theme';
@@ -46,6 +47,14 @@ function MainTabs() {
         options={{
           tabBarLabel: 'Новый заказ',
           tabBarIcon: () => <Text style={{ fontSize: 18 }}>🛒</Text>,
+        }}
+      />
+      <Tab.Screen
+        name="DeliveryToday"
+        component={DeliveryTodayScreen}
+        options={{
+          tabBarLabel: 'Развозка',
+          tabBarIcon: () => <Text style={{ fontSize: 18 }}>🚚</Text>,
         }}
       />
       <Tab.Screen

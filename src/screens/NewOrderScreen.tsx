@@ -9,28 +9,69 @@ import {
   Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Product, OrderItem, Order } from '../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Product, OrderItem, Order, Customer } from '../types';
 import { StorageService } from '../services/storage';
 import { OrderItemCard } from '../components/OrderItemCard';
 import { SelectProductModal } from '../components/SelectProductModal';
+import { SelectCustomerModal } from '../components/SelectCustomerModal';
 import { theme } from '../constants/theme';
 
 export const NewOrderScreen = () => {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [items, setItems] = useState<OrderItem[]>([]);
   const [catalog, setCatalog] = useState<Product[]>([]);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [productModalVisible, setProductModalVisible] = useState(false);
+  const [customerModalVisible, setCustomerModalVisible] = useState(false);
 
   useEffect(() => {
     loadCatalog();
-  }, [modalVisible]);
+    loadCustomers();
+  }, [productModalVisible, customerModalVisible]);
 
   const loadCatalog = async () => {
     const products = await StorageService.getProducts();
     setCatalog(products);
+  };
+
+  const loadCustomers = async () => {
+    const list = await StorageService.getCustomers();
+    setCustomers(list);
+  };
+
+  const handleSelectCustomer = (customer: Customer) => {
+    setCustomerName(customer.name);
+    setCustomerPhone(customer.phone);
+    setDeliveryAddress(customer.address);
+  };
+
+  const handleSaveCustomer = async (updated: Customer) => {
+    await StorageService.saveCustomer(updated);
+    loadCustomers();
+    // Если редактировали выбранного сейчас клиента, обновим и в полях
+    if (customerName === updated.name) {
+      setCustomerPhone(updated.phone);
+      setDeliveryAddress(updated.address);
+    }
+  };
+
+  const handleDeleteCustomer = async (id: string) => {
+    Alert.alert('Удаление', 'Удалить этого заказчика из списка постоянных?', [
+      { text: 'Отмена', style: 'cancel' },
+      {
+        text: 'Удалить',
+        style: 'destructive',
+        onPress: async () => {
+          await StorageService.deleteCustomer(id);
+          loadCustomers();
+        },
+      },
+    ]);
   };
 
   const handleAddProduct = (product: Product) => {
@@ -83,6 +124,16 @@ export const NewOrderScreen = () => {
       return;
     }
 
+    // Сохраняем заказчика в базу постоянных клиентов
+    const customerToSave: Customer = {
+      id: Date.now().toString(),
+      name: customerName.trim(),
+      phone: customerPhone.trim(),
+      address: deliveryAddress.trim(),
+      createdAt: Date.now(),
+    };
+    await StorageService.saveCustomer(customerToSave);
+
     const newOrder: Order = {
       id: Date.now().toString(),
       customerName: customerName.trim(),
@@ -90,6 +141,7 @@ export const NewOrderScreen = () => {
       deliveryAddress: deliveryAddress.trim(),
       items,
       totalAmount: parseFloat(totalOrderAmount.toFixed(2)),
+      status: 'formed',
       createdAt: Date.now(),
     };
 
@@ -108,8 +160,23 @@ export const NewOrderScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.sectionTitle}>Контакты заказчика</Text>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[
+        styles.content,
+        { paddingTop: Math.max(insets.top, 16) + 12 },
+      ]}
+    >
+      <View style={styles.customerHeader}>
+        <Text style={styles.sectionTitle}>Контакты заказчика</Text>
+        <TouchableOpacity
+          style={styles.chooseCustomerBtn}
+          onPress={() => setCustomerModalVisible(true)}
+        >
+          <Text style={styles.chooseCustomerBtnText}>👥 Выбрать из списка</Text>
+        </TouchableOpacity>
+      </View>
+
       <TextInput
         style={styles.input}
         placeholder="Имя заказчика *"
@@ -134,7 +201,7 @@ export const NewOrderScreen = () => {
         <Text style={styles.sectionTitle}>Товары в заказе ({items.length})</Text>
         <TouchableOpacity
           style={styles.addBtn}
-          onPress={() => setModalVisible(true)}
+          onPress={() => setProductModalVisible(true)}
         >
           <Text style={styles.addBtnText}>+ Добавить товар</Text>
         </TouchableOpacity>
@@ -165,10 +232,19 @@ export const NewOrderScreen = () => {
       </TouchableOpacity>
 
       <SelectProductModal
-        visible={modalVisible}
+        visible={productModalVisible}
         products={catalog}
         onSelect={handleAddProduct}
-        onClose={() => setModalVisible(false)}
+        onClose={() => setProductModalVisible(false)}
+      />
+
+      <SelectCustomerModal
+        visible={customerModalVisible}
+        customers={customers}
+        onSelect={handleSelectCustomer}
+        onSaveCustomer={handleSaveCustomer}
+        onDeleteCustomer={handleDeleteCustomer}
+        onClose={() => setCustomerModalVisible(false)}
       />
     </ScrollView>
   );
@@ -183,12 +259,30 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
     paddingBottom: 40,
   },
+  customerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+    marginTop: 8,
+  },
+  chooseCustomerBtn: {
+    backgroundColor: '#F3E9D2',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  chooseCustomerBtnText: {
+    fontSize: 13,
+    color: theme.colors.primary,
+    fontWeight: '600',
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: theme.colors.primary,
-    marginBottom: 8,
-    marginTop: 8,
   },
   input: {
     backgroundColor: theme.colors.cardBg,
@@ -203,7 +297,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 14,
     marginBottom: 8,
   },
   addBtn: {

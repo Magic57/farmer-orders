@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { OrderItem } from '../types';
 import { theme } from '../constants/theme';
@@ -13,10 +13,48 @@ export const OrderItemCard: React.FC<Props> = ({ item, onUpdateQuantity, onRemov
   const isKg = item.unit === 'kg';
   const unitLabel = isKg ? 'кг' : 'шт';
 
+  // Локальный стейт строки, чтобы пользователь мог комфортно вводить запятую/точку и до 3 знаков
+  const [textValue, setTextValue] = useState<string>(
+    item.quantity === 0 ? '' : item.quantity.toString()
+  );
+
+  useEffect(() => {
+    // Синхронизируем, если значение изменилось извне
+    const currentParsed = parseFloat(textValue.replace(',', '.'));
+    if (isNaN(currentParsed) && item.quantity === 0) return;
+    if (currentParsed !== item.quantity) {
+      setTextValue(item.quantity === 0 ? '' : item.quantity.toString());
+    }
+  }, [item.quantity]);
+
   const handleTextChange = (text: string) => {
-    const cleanText = text.replace(',', '.');
-    const parsed = parseFloat(cleanText);
-    onUpdateQuantity(isNaN(parsed) || parsed < 0 ? 0 : parsed);
+    // Разрешаем только цифры, одну точку или запятую
+    const normalized = text.replace(',', '.');
+    
+    // Проверка формата: до 3 знаков после запятой для кг, только целые для шт
+    if (isKg) {
+      // Регулярка: цифры с опциональной точкой и до 3 знаков после неё
+      if (normalized !== '' && !/^\d+(\.\d{0,3})?$/.test(normalized)) {
+        return;
+      }
+    } else {
+      // Для штук только целые положительные числа
+      if (normalized !== '' && !/^\d+$/.test(normalized)) {
+        return;
+      }
+    }
+
+    setTextValue(text);
+
+    if (text === '' || text === '.') {
+      onUpdateQuantity(0);
+      return;
+    }
+
+    const parsed = parseFloat(normalized);
+    if (!isNaN(parsed) && parsed >= 0) {
+      onUpdateQuantity(parsed);
+    }
   };
 
   return (
@@ -36,11 +74,11 @@ export const OrderItemCard: React.FC<Props> = ({ item, onUpdateQuantity, onRemov
         <View style={styles.inputContainer}>
           <Text style={styles.inputLabel}>{isKg ? 'Вес (кг):' : 'Кол-во (шт):'}</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, isKg && styles.inputKg]}
             keyboardType="decimal-pad"
-            value={item.quantity === 0 ? '' : item.quantity.toString()}
+            value={textValue}
             onChangeText={handleTextChange}
-            placeholder="0"
+            placeholder={isKg ? '0.000' : '0'}
           />
         </View>
 
@@ -103,12 +141,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.sm,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 4,
     width: 75,
     textAlign: 'center',
     fontSize: 15,
     backgroundColor: '#FAF8F5',
+  },
+  inputKg: {
+    width: 95, // Расширенное поле для ввода трех знаков после запятой (например 4,155)
   },
   totalBlock: {
     alignItems: 'flex-end',
