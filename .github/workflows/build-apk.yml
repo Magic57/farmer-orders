@@ -30,18 +30,13 @@ jobs:
       - name: 🛠️ Генерация нативного Android проекта (Expo Prebuild)
         run: npx expo prebuild --platform android --clean
 
-      - name: 📦 Предварительная упаковка JS-бандла и ассетов
-        run: |
-          mkdir -p android/app/src/main/assets
-          npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res/
-
       - name: 🔑 Выдача прав на выполнение Gradle
         run: chmod +x android/gradlew
 
-      - name: 🚀 Сборка автономного APK
+      - name: 🚀 Сборка автономного Release APK (с автоматической упаковкой бандла)
         run: |
           cd android
-          ./gradlew assembleRelease --no-daemon || ./gradlew assembleDebug -PreactNativeDevServerPort=8081 --no-daemon
+          ./gradlew assembleRelease --no-daemon
 
       - name: 🔍 Поиск и сохранение APK
         run: |
