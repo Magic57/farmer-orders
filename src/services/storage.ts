@@ -106,10 +106,21 @@ export const StorageService = {
 
   async saveProduct(product: Product, farmId?: string): Promise<void> {
     try {
-      const prodToSave = { ...product, farmId: farmId || product.farmId || '' };
-      if (farmId || product.farmId) {
+      const targetFarmId = farmId || product.farmId || '';
+      const prodToSave: Product = {
+        id: product.id,
+        name: product.name,
+        unit: product.unit,
+        pricePerUnit: product.pricePerUnit,
+        farmId: targetFarmId,
+        createdAt: product.createdAt || Date.now(),
+        ...(product.imageUri ? { imageUri: product.imageUri } : {}),
+      };
+
+      if (targetFarmId) {
         await setDoc(doc(db, 'products', product.id), prodToSave);
       }
+
       // Локальный кеш
       const products = await this.getProducts();
       const index = products.findIndex((p) => p.id === product.id);
@@ -181,8 +192,32 @@ export const StorageService = {
 
   async saveOrder(order: Order, farmId?: string): Promise<void> {
     try {
-      const orderToSave = { ...order, farmId: farmId || order.farmId || '' };
-      if (farmId || order.farmId) {
+      const targetFarmId = farmId || order.farmId || '';
+      // Firestore не принимает undefined поля — очищаем объект
+      const orderToSave: any = {
+        id: order.id,
+        customerName: order.customerName,
+        customerPhone: order.customerPhone || '',
+        items: order.items.map((i) => ({
+          productId: i.productId,
+          productName: i.productName,
+          unit: i.unit,
+          pricePerUnit: i.pricePerUnit,
+          quantity: i.quantity,
+          amount: i.amount,
+          ...(i.piecesCount !== undefined ? { piecesCount: i.piecesCount } : {}),
+          ...(i.actualWeight !== undefined ? { actualWeight: i.actualWeight } : {}),
+        })),
+        totalAmount: order.totalAmount,
+        status: order.status || 'formed',
+        farmId: targetFarmId,
+        createdAt: order.createdAt || Date.now(),
+      };
+      if (order.deliveryAddress) orderToSave.deliveryAddress = order.deliveryAddress;
+      if (order.deliveryDate) orderToSave.deliveryDate = order.deliveryDate;
+      if (order.completedAt) orderToSave.completedAt = order.completedAt;
+
+      if (targetFarmId) {
         await setDoc(doc(db, 'orders', order.id), orderToSave);
       }
 
@@ -224,8 +259,17 @@ export const StorageService = {
 
   async saveCustomer(customer: Customer, farmId?: string): Promise<void> {
     try {
-      const custToSave = { ...customer, farmId: farmId || customer.farmId || '' };
-      if (farmId || customer.farmId) {
+      const targetFarmId = farmId || customer.farmId || '';
+      const custToSave: any = {
+        id: customer.id,
+        name: customer.name,
+        phone: customer.phone || '',
+        farmId: targetFarmId,
+        createdAt: customer.createdAt || Date.now(),
+      };
+      if (customer.defaultAddress) custToSave.defaultAddress = customer.defaultAddress;
+
+      if (targetFarmId) {
         await setDoc(doc(db, 'customers', customer.id), custToSave);
       }
 
@@ -252,27 +296,6 @@ export const StorageService = {
       await AsyncStorage.setItem(CUSTOMERS_KEY, JSON.stringify(filtered));
     } catch (e) {
       console.error('Ошибка удаления заказчика:', e);
-    }
-  },
-
-  async importOrders(importedList: Order[]): Promise<number> {
-    try {
-      const existing = await this.getOrders();
-      let addedCount = 0;
-      for (const item of importedList) {
-        const idx = existing.findIndex((e) => e.id === item.id);
-        if (idx >= 0) {
-          existing[idx] = item;
-        } else {
-          existing.unshift(item);
-          addedCount++;
-        }
-      }
-      await AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(existing));
-      return addedCount;
-    } catch (e) {
-      console.error('Ошибка импорта заказов:', e);
-      throw e;
     }
   },
 };

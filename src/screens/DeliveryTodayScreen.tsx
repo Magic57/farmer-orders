@@ -14,9 +14,6 @@ import {
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import * as DocumentPicker from 'expo-document-picker';
 import { Order, RootStackParamList } from '../types';
 import { StorageService } from '../services/storage';
 import { useAuth } from '../context/AuthContext';
@@ -88,85 +85,7 @@ export const DeliveryTodayScreen = () => {
     );
   };
 
-  // Экспорт заказов в файл для мессенджера
-  const handleExportOrders = async () => {
-    if (activeOrders.length === 0) {
-      Alert.alert('Экспорт', 'Сначала добавьте заказы на развозку.');
-      return;
-    }
 
-    try {
-      const todayStr = new Date().toISOString().split('T')[0];
-      const fileName = `razvozka_${todayStr}.json`;
-      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
-
-      const payload = {
-        exportDate: todayStr,
-        version: '1.0',
-        orders: activeOrders,
-      };
-
-      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(payload, null, 2));
-
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'application/json',
-          dialogTitle: 'Отправить заказы на сборку',
-          UTI: 'public.json',
-        });
-      } else {
-        Alert.alert('Ошибка', 'Функция "Поделиться" недоступна на этом устройстве.');
-      }
-    } catch (e) {
-      console.error(e);
-      Alert.alert('Ошибка экспорта', 'Не удалось экспортировать файл.');
-    }
-  };
-
-  // Импорт заказов из файла мессенджера на другом телефоне
-  const handleImportOrders = async () => {
-    try {
-      const res = await DocumentPicker.getDocumentAsync({
-        type: ['application/json', '*/*'],
-        copyToCacheDirectory: true,
-      });
-
-      if (res.canceled || !res.assets || res.assets.length === 0) {
-        return;
-      }
-
-      const file = res.assets[0];
-      const content = await FileSystem.readAsStringAsync(file.uri);
-      const parsed = JSON.parse(content);
-
-      let importedList: Order[] = [];
-      if (Array.isArray(parsed)) {
-        importedList = parsed;
-      } else if (parsed && Array.isArray(parsed.orders)) {
-        importedList = parsed.orders;
-      }
-
-      if (importedList.length === 0) {
-        Alert.alert('Ошибка', 'В выбранном файле нет подходящих заказов.');
-        return;
-      }
-
-      // Все импортированные заказы автоматически ставим в статус 'in_progress' (развозка)
-      const preparedList = importedList.map((o) => ({
-        ...o,
-        status: 'in_progress' as const,
-      }));
-
-      const added = await StorageService.importOrders(preparedList);
-      Alert.alert(
-        'Успешный импорт! 🎉',
-        `Загружено заказов: ${preparedList.length} (новых добавлено: ${added}). Они готовы к сборке!`
-      );
-    } catch (e) {
-      console.error(e);
-      Alert.alert('Ошибка импорта', 'Не удалось прочитать файл. Убедитесь, что это файл формата .json');
-    }
-  };
 
   // Сводный перечень продуктов для сборщика (чтобы сразу видеть сколько всего собрать)
   const getPrepSummary = () => {
@@ -239,22 +158,12 @@ export const DeliveryTodayScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Панель экспорта, импорта и листа сборки (скрыта в режиме чистого развозчика для чистоты) */}
-      {!driverMode && (
+      {/* Кнопка листа сборки для заготовки/взвешивания (в режиме диспетчера) */}
+      {!driverMode && activeOrders.length > 0 && (
         <View style={styles.syncBar}>
-          <TouchableOpacity style={styles.syncBtn} onPress={handleExportOrders}>
-            <Text style={styles.syncBtnText}>📤 Экспорт в мессенджер</Text>
+          <TouchableOpacity style={[styles.syncBtn, styles.prepBtn]} onPress={() => setPrepModalVisible(true)}>
+            <Text style={styles.prepBtnText}>📋 Лист сборки ({activeOrders.length} заказов)</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.syncBtn, styles.importBtn]} onPress={handleImportOrders}>
-            <Text style={styles.importBtnText}>📥 Импорт файла</Text>
-          </TouchableOpacity>
-
-          {activeOrders.length > 0 && (
-            <TouchableOpacity style={[styles.syncBtn, styles.prepBtn]} onPress={() => setPrepModalVisible(true)}>
-              <Text style={styles.prepBtnText}>📋 Лист сборки</Text>
-            </TouchableOpacity>
-          )}
         </View>
       )}
 
@@ -263,7 +172,7 @@ export const DeliveryTodayScreen = () => {
           <Text style={styles.emptyIcon}>🚚</Text>
           <Text style={styles.emptyTitle}>На сегодня нет заказов в работе</Text>
           <Text style={styles.emptySubtitle}>
-            Нажмите «+ Заказ» для добавления из сформированных, либо нажмите «📥 Импорт файла», если коллега прислал список из мессенджера!
+            Нажмите «+ Заказ» вверху экрана, чтобы выбрать нужные заказы из сформированных на сегодняшнюю развозку.
           </Text>
         </View>
       ) : (

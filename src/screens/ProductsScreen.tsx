@@ -29,6 +29,20 @@ export const ProductsScreen = () => {
     return unsubscribe;
   }, [user?.farmId]);
 
+  useFocusEffect(
+    useCallback(() => {
+      StorageService.getProducts().then((list) => {
+        if (list.length > 0) {
+          if (user?.farmId) {
+            setProducts(list.filter((p) => p.farmId === user.farmId));
+          } else {
+            setProducts(list);
+          }
+        }
+      });
+    }, [user?.farmId])
+  );
+
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) + 8 }]}>

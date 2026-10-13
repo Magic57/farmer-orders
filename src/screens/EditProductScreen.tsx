@@ -58,18 +58,23 @@ export const EditProductScreen = () => {
       return;
     }
 
-    const productToSave: Product = {
-      id: existingProduct?.id || Date.now().toString(),
-      name: name.trim(),
-      unit,
-      pricePerUnit: parsedPrice,
-      imageUri,
-      farmId: user?.farmId || '',
-      createdAt: existingProduct?.createdAt || Date.now(),
-    };
+    try {
+      const productToSave: Product = {
+        id: existingProduct?.id || Date.now().toString(),
+        name: name.trim(),
+        unit,
+        pricePerUnit: parsedPrice,
+        imageUri,
+        farmId: user?.farmId || '',
+        createdAt: existingProduct?.createdAt || Date.now(),
+      };
 
-    await StorageService.saveProduct(productToSave, user?.farmId);
-    navigation.goBack();
+      await StorageService.saveProduct(productToSave, user?.farmId);
+      navigation.goBack();
+    } catch (e: any) {
+      console.error(e);
+      Alert.alert('Ошибка сохранения', e.message || 'Не удалось сохранить товар');
+    }
   };
 
   const handleDelete = () => {
