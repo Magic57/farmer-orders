@@ -2,6 +2,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
+  sendPasswordResetEmail,
   onAuthStateChanged,
   User,
 } from 'firebase/auth';
@@ -130,6 +131,10 @@ export const AuthService = {
 
   async logout(): Promise<void> {
     await signOut(auth);
+  },
+
+  async resetPassword(email: string): Promise<void> {
+    await sendPasswordResetEmail(auth, email.trim());
   },
 
   async updateUserRole(uid: string, role: UserRole): Promise<void> {

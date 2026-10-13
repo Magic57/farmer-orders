@@ -18,16 +18,43 @@ import { theme } from '../constants/theme';
 
 export const AuthScreen = () => {
   const insets = useSafeAreaInsets();
-  const { login, registerNewFarm, registerJoinFarm } = useAuth();
+  const { login, registerNewFarm, registerJoinFarm, resetPassword } = useAuth();
 
   const [mode, setMode] = useState<'login' | 'register_new' | 'register_join'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [farmName, setFarmName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [role, setRole] = useState<UserRole>('manager');
   const [loading, setLoading] = useState(false);
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      Alert.alert(
+        'Восстановление пароля',
+        'Пожалуйста, введите ваш адрес электронной почты (Email) в поле выше, чтобы мы могли отправить ссылку для сброса пароля.'
+      );
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await resetPassword(email.trim());
+      Alert.alert(
+        'Письмо отправлено! ✉️',
+        `Инструкция по восстановлению пароля отправлена на адрес:\n${email.trim()}\n\nПроверьте почту (включая папку "Спам").`
+      );
+    } catch (e: any) {
+      let msg = e.message || 'Не удалось отправить ссылку';
+      if (msg.includes('auth/user-not-found')) msg = 'Пользователь с таким email не найден';
+      if (msg.includes('auth/invalid-email')) msg = 'Некорректный email адрес';
+      Alert.alert('Ошибка', msg);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
@@ -182,13 +209,31 @@ export const AuthScreen = () => {
           />
 
           <Text style={styles.label}>Пароль</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Минимум 6 символов"
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-          />
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={styles.passwordInput}
+              placeholder="Минимум 6 символов"
+              secureTextEntry={!showPassword}
+              value={password}
+              onChangeText={setPassword}
+            />
+            <TouchableOpacity
+              style={styles.eyeBtn}
+              onPress={() => setShowPassword(!showPassword)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Text style={styles.eyeIcon}>{showPassword ? '👁️' : '🙈'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {mode === 'login' && (
+            <TouchableOpacity
+              style={styles.forgotPassBtn}
+              onPress={handleForgotPassword}
+            >
+              <Text style={styles.forgotPassText}>Забыли пароль?</Text>
+            </TouchableOpacity>
+          )}
 
           {mode !== 'login' && (
             <>
@@ -378,5 +423,35 @@ const styles = StyleSheet.create({
     color: theme.colors.white,
     fontSize: 15,
     fontWeight: '700',
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FAF8F5',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+  },
+  passwordInput: {
+    flex: 1,
+    padding: 10,
+    fontSize: 15,
+  },
+  eyeBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  eyeIcon: {
+    fontSize: 18,
+  },
+  forgotPassBtn: {
+    alignSelf: 'flex-end',
+    marginTop: 6,
+    paddingVertical: 4,
+  },
+  forgotPassText: {
+    fontSize: 13,
+    color: theme.colors.primary,
+    fontWeight: '600',
   },
 });
