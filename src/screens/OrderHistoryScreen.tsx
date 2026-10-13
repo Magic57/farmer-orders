@@ -11,12 +11,17 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Order, RootStackParamList } from '../types';
 import { StorageService } from '../services/storage';
+import { DateRangePickerModal } from '../components/DateRangePickerModal';
 import { theme } from '../constants/theme';
 
 export const OrderHistoryScreen = () => {
   const insets = useSafeAreaInsets();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filter, setFilter] = useState<'all' | 'completed' | 'formed'>('all');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [rangeModalVisible, setRangeModalVisible] = useState(false);
+
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const loadOrders = async () => {
@@ -47,15 +52,70 @@ export const OrderHistoryScreen = () => {
     }
   };
 
+  const formatTimestampToYMD = (ts: number) => {
+    const d = new Date(ts);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
   const filteredOrders = orders.filter((o) => {
-    if (filter === 'all') return true;
-    return o.status === filter;
+    // Фильтр по статусу
+    if (filter !== 'all' && o.status !== filter) {
+      return false;
+    }
+
+    // Фильтр по дате завершения
+    if (startDate && endDate) {
+      // Дата завершения (если есть completedAt, иначе fallback на createdAt если завершен)
+      const completionTime = o.completedAt || (o.status === 'completed' ? o.createdAt : null);
+      if (!completionTime) return false;
+
+      const orderYMD = formatTimestampToYMD(completionTime);
+      if (orderYMD < startDate || orderYMD > endDate) {
+        return false;
+      }
+    }
+
+    return true;
   });
+
+  const totalSumFiltered = filteredOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+
+  const formatRangeLabel = () => {
+    if (!startDate) return '📅 Фильтр по дате завершения';
+    const s = startDate.split('-').reverse().join('.');
+    const e = endDate ? endDate.split('-').reverse().join('.') : s;
+    return `📅 С ${s} по ${e} ✕`;
+  };
 
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) + 8 }]}>
-        <Text style={styles.title}>История заказов</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>История заказов</Text>
+          <Text style={styles.summaryText}>
+            {filteredOrders.length} заказов • {totalSumFiltered.toFixed(2)} ₽
+          </Text>
+        </View>
+
+        {/* Кнопка фильтра диапазона дат */}
+        <TouchableOpacity
+          style={[styles.rangeBtn, !!startDate && styles.rangeBtnActive]}
+          onPress={() => {
+            if (startDate) {
+              setStartDate('');
+              setEndDate('');
+            } else {
+              setRangeModalVisible(true);
+            }
+          }}
+        >
+          <Text style={[styles.rangeBtnText, !!startDate && styles.rangeBtnTextActive]}>
+            {formatRangeLabel()}
+          </Text>
+        </TouchableOpacity>
 
         <View style={styles.filterRow}>
           <TouchableOpacity
@@ -82,9 +142,11 @@ export const OrderHistoryScreen = () => {
       {filteredOrders.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyIcon}>📋</Text>
-          <Text style={styles.emptyTitle}>Заказов нет</Text>
+          <Text style={styles.emptyTitle}>Заказов не найдено</Text>
           <Text style={styles.emptySubtitle}>
-            {filter === 'completed'
+            {startDate
+              ? 'В выбранном диапазоне дат нет завершенных заказов. Попробуйте сбросить фильтр дат.'
+              : filter === 'completed'
               ? 'Завершенные заказы появятся здесь после доставки.'
               : 'Оформите заказ на вкладке «Новый заказ».'}
           </Text>
@@ -109,7 +171,13 @@ export const OrderHistoryScreen = () => {
                   </View>
                 </View>
 
-                <Text style={styles.date}>Создан: {formatDate(item.createdAt)}</Text>
+                {item.completedAt ? (
+                  <Text style={styles.completedDateText}>
+                    ✅ Завершен: {formatDate(item.completedAt)}
+                  </Text>
+                ) : (
+                  <Text style={styles.date}>Создан: {formatDate(item.createdAt)}</Text>
+                )}
 
                 {item.deliveryDate ? (
                   <Text style={styles.deliveryDateText}>
@@ -132,6 +200,21 @@ export const OrderHistoryScreen = () => {
           }}
         />
       )}
+
+      <DateRangePickerModal
+        visible={rangeModalVisible}
+        startDate={startDate}
+        endDate={endDate}
+        onApplyRange={(start, end) => {
+          setStartDate(start);
+          setEndDate(end);
+        }}
+        onClear={() => {
+          setStartDate('');
+          setEndDate('');
+        }}
+        onClose={() => setRangeModalVisible(false)}
+      />
     </View>
   );
 };
@@ -148,11 +231,44 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: theme.colors.border,
   },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 8,
+  },
   title: {
     fontSize: 20,
     fontWeight: '700',
     color: theme.colors.primary,
-    marginBottom: 10,
+  },
+  summaryText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.primary,
+  },
+  rangeBtn: {
+    backgroundColor: '#FAF8F5',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.sm,
+    marginBottom: 8,
+    alignItems: 'center',
+  },
+  rangeBtnActive: {
+    backgroundColor: '#E8F5E9',
+    borderColor: theme.colors.primary,
+  },
+  rangeBtnText: {
+    fontSize: 13,
+    color: theme.colors.textMuted,
+    fontWeight: '600',
+  },
+  rangeBtnTextActive: {
+    color: theme.colors.primary,
+    fontWeight: '700',
   },
   filterRow: {
     flexDirection: 'row',
@@ -210,6 +326,12 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 12,
     color: theme.colors.textMuted,
+    marginBottom: 4,
+  },
+  completedDateText: {
+    fontSize: 12,
+    color: '#2D6A4F',
+    fontWeight: '600',
     marginBottom: 4,
   },
   deliveryDateText: {
