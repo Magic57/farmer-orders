@@ -7,7 +7,7 @@ interface Props {
   item: OrderItem;
   onUpdateItem: (updated: { piecesCount?: number; actualWeight?: number; quantity: number; totalPrice: number }) => void;
   onRemove: () => void;
-  showWeightInput?: boolean; // Показывать ли поле фактического взвешивания (для работы/доставки)
+  showWeightInput?: boolean;
 }
 
 export const OrderItemCard: React.FC<Props> = ({
@@ -37,38 +37,50 @@ export const OrderItemCard: React.FC<Props> = ({
     }
   }, [item.piecesCount, item.actualWeight]);
 
-  const handlePiecesChange = (text: string) => {
-    // Только целые числа для штук
-    const clean = text.replace(/[^0-9]/g, '');
-    setPiecesText(clean);
+  const updatePiecesValue = (newPieces: number) => {
+    const validPieces = Math.max(0, newPieces);
+    setPiecesText(validPieces.toString());
 
-    const pieces = parseInt(clean, 10) || 0;
     const currentWeight = parseFloat(weightText.replace(',', '.')) || 0;
-
     let qty = 0;
     let total = 0;
 
     if (isKgProduct) {
-      // Если весовой товар: если фактический вес уже взвешен, считаем по нему, иначе 0 ₽ до взвешивания
       qty = currentWeight > 0 ? currentWeight : 0;
       total = parseFloat((qty * item.pricePerUnit).toFixed(2));
     } else {
-      // Если штучный товар: считаем по штукам
-      qty = pieces;
-      total = parseFloat((pieces * item.pricePerUnit).toFixed(2));
+      qty = validPieces;
+      total = parseFloat((validPieces * item.pricePerUnit).toFixed(2));
     }
 
     onUpdateItem({
-      piecesCount: pieces,
+      piecesCount: validPieces,
       actualWeight: currentWeight,
       quantity: qty,
       totalPrice: total,
     });
   };
 
+  const handlePiecesChange = (text: string) => {
+    const clean = text.replace(/[^0-9]/g, '');
+    const pieces = parseInt(clean, 10) || 0;
+    updatePiecesValue(pieces);
+  };
+
+  const handleIncrement = () => {
+    const current = parseInt(piecesText, 10) || 0;
+    updatePiecesValue(current + 1);
+  };
+
+  const handleDecrement = () => {
+    const current = parseInt(piecesText, 10) || 0;
+    if (current > 1) {
+      updatePiecesValue(current - 1);
+    }
+  };
+
   const handleWeightChange = (text: string) => {
     const normalized = text.replace(',', '.');
-    // До 3 знаков после запятой
     if (normalized !== '' && !/^\d+(\.\d{0,3})?$/.test(normalized)) {
       return;
     }
@@ -76,7 +88,6 @@ export const OrderItemCard: React.FC<Props> = ({
 
     const pieces = parseInt(piecesText, 10) || 0;
     const weight = parseFloat(normalized) || 0;
-
     const total = parseFloat((weight * item.pricePerUnit).toFixed(2));
 
     onUpdateItem({
@@ -101,23 +112,42 @@ export const OrderItemCard: React.FC<Props> = ({
       </Text>
 
       <View style={styles.controlsRow}>
-        {/* Поле количества штук (доступно всегда: и для штучных, и для весовых тушек) */}
-        <View style={styles.inputContainer}>
+        {/* Блок со счетчиком количества штук и кнопками [-] и [+] */}
+        <View style={styles.counterBlock}>
           <Text style={styles.inputLabel}>
-            {isKgProduct ? 'Кол-во (шт):' : 'Кол-во:'}
+            {isKgProduct ? 'Кол-во:' : 'Кол-во:'}
           </Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="number-pad"
-            value={piecesText}
-            onChangeText={handlePiecesChange}
-            placeholder="0"
-          />
+
+          <View style={styles.stepper}>
+            <TouchableOpacity
+              style={styles.stepBtn}
+              onPress={handleDecrement}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.stepBtnText}>−</Text>
+            </TouchableOpacity>
+
+            <TextInput
+              style={styles.stepInput}
+              keyboardType="number-pad"
+              value={piecesText}
+              onChangeText={handlePiecesChange}
+              placeholder="0"
+            />
+
+            <TouchableOpacity
+              style={styles.stepBtn}
+              onPress={handleIncrement}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.stepBtnText}>+</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Для весовых товаров: ввод фактического веса */}
         {isKgProduct && showWeightInput && (
-          <View style={styles.inputContainer}>
+          <View style={styles.weightBlock}>
             <Text style={styles.inputLabel}>Вес (кг):</Text>
             <TextInput
               style={[styles.input, styles.inputKg]}
@@ -180,7 +210,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     flexWrap: 'wrap',
   },
-  inputContainer: {
+  counterBlock: {
     flexDirection: 'row',
     alignItems: 'center',
     marginRight: 6,
@@ -190,6 +220,43 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: theme.colors.textMain,
     marginRight: 6,
+    fontWeight: '500',
+  },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FAF8F5',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    overflow: 'hidden',
+  },
+  stepBtn: {
+    width: 32,
+    height: 32,
+    backgroundColor: '#ECE7DE',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stepBtnText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.colors.primary,
+  },
+  stepInput: {
+    width: 42,
+    height: 32,
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textMain,
+    paddingVertical: 0,
+  },
+  weightBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 6,
+    marginVertical: 4,
   },
   input: {
     borderWidth: 1,
@@ -203,7 +270,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAF8F5',
   },
   inputKg: {
-    width: 85,
+    width: 82,
+    height: 32,
   },
   totalBlock: {
     alignItems: 'flex-end',

@@ -8,6 +8,7 @@ import {
   Alert,
   Modal,
   SafeAreaView,
+  Linking,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -123,7 +124,14 @@ export const DeliveryTodayScreen = () => {
                 </View>
 
                 {item.customerPhone ? (
-                  <Text style={styles.phone}>📞 {item.customerPhone}</Text>
+                  <TouchableOpacity
+                    style={styles.phoneContainer}
+                    onPress={() => Linking.openURL(`tel:${item.customerPhone}`)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.phone}>📞 {item.customerPhone}</Text>
+                    <Text style={styles.callBadge}>Позвонить</Text>
+                  </TouchableOpacity>
                 ) : null}
 
                 {item.deliveryDate ? (
@@ -305,11 +313,27 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 4,
   },
+  phoneContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#EEF6EC',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: theme.radius.sm,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#D4E7CF',
+  },
   phone: {
     fontSize: 14,
     color: theme.colors.primary,
+    fontWeight: '700',
+  },
+  callBadge: {
+    fontSize: 12,
+    color: theme.colors.primary,
     fontWeight: '600',
-    marginBottom: 4,
   },
   address: {
     fontSize: 13,
