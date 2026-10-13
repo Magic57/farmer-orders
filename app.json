@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Фермерские Заказы",
-    "slug": "farmer-orders",
+    "name": "Подворье",
+    "slug": "podvorie",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

@@ -37,7 +37,7 @@ export const ProfileScreen = () => {
     if (!user?.inviteCode) return;
     try {
       await Share.share({
-        message: `Присоединяйся к нашему хозяйству "${user.farmName}" в приложении "Фермерские Заказы"! Введи код приглашения: ${user.inviteCode}`,
+        message: `Присоединяйся к нашему хозяйству "${user.farmName}" в приложении "Подворье"! Введи код приглашения: ${user.inviteCode}`,
       });
     } catch (e) {
       console.error(e);

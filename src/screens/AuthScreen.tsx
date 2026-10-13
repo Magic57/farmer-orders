@@ -121,7 +121,7 @@ export const AuthScreen = () => {
       >
         <View style={styles.header}>
           <Text style={styles.logoIcon}>🌾</Text>
-          <Text style={styles.appTitle}>Фермерские Заказы</Text>
+          <Text style={styles.appTitle}>Подворье</Text>
           <Text style={styles.appSubtitle}>
             Единая облачная сеть для хозяйства и команды
           </Text>
