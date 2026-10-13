@@ -29,14 +29,13 @@ export const DeliveryTodayScreen = () => {
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [prepModalVisible, setPrepModalVisible] = useState(false);
 
-  // Режим экрана: для роли courier всегда включен упрощенный режим, а диспетчер может переключать тумблером
-  const [driverMode, setDriverMode] = useState<boolean>(user?.role === 'courier');
+  // Тогглер отображается и работает только для роли 'courier' (позволяет развозчику переключаться между простым видом и диспетчерским)
+  // Для диспетчера и сборщика всегда false (полный диспетчерский вид)
+  const isCourier = user?.role === 'courier';
+  const [driverMode, setDriverMode] = useState<boolean>(isCourier);
 
-  // Если роль пользователя изменилась, синхронизируем дефолт
   useEffect(() => {
-    if (user?.role === 'courier') {
-      setDriverMode(true);
-    }
+    setDriverMode(user?.role === 'courier');
   }, [user?.role]);
 
   useEffect(() => {
@@ -137,26 +136,28 @@ export const DeliveryTodayScreen = () => {
         )}
       </View>
 
-      {/* Тумблер переключения режимов «Диспетчер» / «Развозчик» */}
-      <View style={styles.modeToggleBar}>
-        <TouchableOpacity
-          style={[styles.modeToggleTab, !driverMode && styles.modeToggleTabActive]}
-          onPress={() => setDriverMode(false)}
-        >
-          <Text style={[styles.modeToggleText, !driverMode && styles.modeToggleTextActive]}>
-            📝 Режим «Диспетчер»
-          </Text>
-        </TouchableOpacity>
+      {/* Тумблер переключения режимов «Диспетчер» / «Развозчик» отображается ТОЛЬКО для роли Развозчик */}
+      {isCourier && (
+        <View style={styles.modeToggleBar}>
+          <TouchableOpacity
+            style={[styles.modeToggleTab, !driverMode && styles.modeToggleTabActive]}
+            onPress={() => setDriverMode(false)}
+          >
+            <Text style={[styles.modeToggleText, !driverMode && styles.modeToggleTextActive]}>
+              📝 Режим «Диспетчер»
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.modeToggleTab, driverMode && styles.modeToggleTabActive]}
-          onPress={() => setDriverMode(true)}
-        >
-          <Text style={[styles.modeToggleText, driverMode && styles.modeToggleTextActive]}>
-            🚗 Режим «Развозчик»
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={[styles.modeToggleTab, driverMode && styles.modeToggleTabActive]}
+            onPress={() => setDriverMode(true)}
+          >
+            <Text style={[styles.modeToggleText, driverMode && styles.modeToggleTextActive]}>
+              🚗 Режим «Развозчик»
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Кнопка листа сборки для заготовки/взвешивания (в режиме диспетчера) */}
       {!driverMode && activeOrders.length > 0 && (
