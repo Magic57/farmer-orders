@@ -4,8 +4,10 @@
     "slug": "farmer-orders",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#2D5A27"
     },
@@ -16,6 +18,10 @@
       "supportsTablet": true
     },
     "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2D5A27"
+      },
       "package": "com.farmer.orders"
     },
     "plugins": [
