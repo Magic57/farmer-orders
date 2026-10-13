@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -42,7 +42,6 @@ export const DeliveryTodayScreen = () => {
 
   const handlePickOrder = async (orderId: string) => {
     await StorageService.updateOrderStatus(orderId, 'in_progress');
-    loadData();
   };
 
   const handleCompleteOrder = (orderId: string, customerName: string) => {
@@ -56,7 +55,6 @@ export const DeliveryTodayScreen = () => {
           style: 'default',
           onPress: async () => {
             await StorageService.updateOrderStatus(orderId, 'completed');
-            loadData();
           },
         },
       ]
@@ -74,7 +72,6 @@ export const DeliveryTodayScreen = () => {
           style: 'default',
           onPress: async () => {
             await StorageService.updateOrderStatus(orderId, 'formed');
-            loadData();
           },
         },
       ]
@@ -151,7 +148,6 @@ export const DeliveryTodayScreen = () => {
       }));
 
       const added = await StorageService.importOrders(preparedList);
-      loadData();
       Alert.alert(
         'Успешный импорт! 🎉',
         `Загружено заказов: ${preparedList.length} (новых добавлено: ${added}). Они готовы к сборке!`
@@ -194,7 +190,9 @@ export const DeliveryTodayScreen = () => {
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) + 8 }]}>
         <View>
-          <Text style={styles.title}>Развозка сегодня 🚚</Text>
+          <Text style={styles.title}>
+            {user?.role === 'picker' ? 'Сборка заказов 📦' : 'Развозка сегодня 🚚'}
+          </Text>
           <Text style={styles.subtitle}>
             В работе: {activeOrders.length} | Итого: {totalDeliverySum.toFixed(2)} ₽
           </Text>
