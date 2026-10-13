@@ -5,6 +5,8 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -23,6 +25,8 @@ export const OrderHistoryScreen = () => {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [rangeModalVisible, setRangeModalVisible] = useState(false);
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
@@ -88,6 +92,57 @@ export const OrderHistoryScreen = () => {
     return `📅 С ${s} по ${e} ✕`;
   };
 
+  const toggleSelectOrder = (id: string) => {
+    setSelectedOrderIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const isAllSelected =
+    filteredOrders.length > 0 &&
+    filteredOrders.every((o) => selectedOrderIds.includes(o.id));
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      // Снять выбор со всех отфильтрованных
+      const filteredIds = new Set(filteredOrders.map((o) => o.id));
+      setSelectedOrderIds((prev) => prev.filter((id) => !filteredIds.has(id)));
+    } else {
+      // Выбрать все отфильтрованные
+      const newSelected = new Set([...selectedOrderIds, ...filteredOrders.map((o) => o.id)]);
+      setSelectedOrderIds(Array.from(newSelected));
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedOrderIds.length === 0) return;
+
+    const count = selectedOrderIds.length;
+    Alert.alert(
+      'Удаление заказов',
+      `Вы действительно хотите удалить выбранные заказы (${count} шт.)? Это действие нельзя отменить.`,
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: `Удалить (${count})`,
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsDeleting(true);
+              await StorageService.deleteOrdersBatch(selectedOrderIds);
+              setSelectedOrderIds([]);
+            } catch (err) {
+              console.error(err);
+              Alert.alert('Ошибка', 'Не удалось удалить выбранные заказы');
+            } finally {
+              setIsDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) + 8 }]}>
@@ -135,6 +190,41 @@ export const OrderHistoryScreen = () => {
             <Text style={[styles.filterText, filter === 'formed' && styles.filterTextActive]}>Сформированные</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Панель массовых действий с заказами */}
+        {filteredOrders.length > 0 && (
+          <View style={styles.batchBar}>
+            <TouchableOpacity
+              style={styles.selectAllBtn}
+              onPress={handleToggleSelectAll}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.checkbox, isAllSelected && styles.checkboxActive]}>
+                {isAllSelected && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+              <Text style={styles.selectAllText}>
+                {isAllSelected ? 'Снять выделение' : 'Выбрать все'}
+              </Text>
+            </TouchableOpacity>
+
+            {selectedOrderIds.length > 0 && (
+              <TouchableOpacity
+                style={[styles.deleteBatchBtn, isDeleting && styles.deleteBatchBtnDisabled]}
+                onPress={handleDeleteSelected}
+                disabled={isDeleting}
+                activeOpacity={0.8}
+              >
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Text style={styles.deleteBatchText}>
+                    🗑 Удалить ({selectedOrderIds.length})
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </View>
 
       {filteredOrders.length === 0 ? (
@@ -156,50 +246,74 @@ export const OrderHistoryScreen = () => {
           contentContainerStyle={styles.list}
           renderItem={({ item }) => {
             const badge = getStatusBadge(item.status);
+            const isSelected = selectedOrderIds.includes(item.id);
+
             return (
-              <TouchableOpacity
-                style={styles.card}
-                onPress={() => navigation.navigate('EditOrder', { orderId: item.id })}
-                activeOpacity={0.8}
-              >
-                <View style={styles.cardTop}>
-                  <Text style={styles.customerName}>{item.customerName}</Text>
-                  <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-                    <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
+              <View style={[styles.card, isSelected && styles.cardSelected]}>
+                <View style={styles.cardHeaderRow}>
+                  {/* Чек-бокс выбора заказа */}
+                  <TouchableOpacity
+                    style={styles.cardCheckboxTouchable}
+                    onPress={() => toggleSelectOrder(item.id)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.checkbox, isSelected && styles.checkboxActive]}>
+                      {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Заголовок карточки заказчика */}
+                  <TouchableOpacity
+                    style={styles.cardTitleTouchable}
+                    onPress={() => navigation.navigate('EditOrder', { orderId: item.id })}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.customerName}>{item.customerName}</Text>
+                    <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+                      <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Основное тело карточки */}
+                <TouchableOpacity
+                  style={styles.cardBodyTouchable}
+                  onPress={() => navigation.navigate('EditOrder', { orderId: item.id })}
+                  activeOpacity={0.8}
+                >
+                  {item.completedAt ? (
+                    <Text style={styles.completedDateText}>
+                      ✅ Завершен: {formatDate(item.completedAt)}
+                    </Text>
+                  ) : (
+                    <Text style={styles.date}>Создан: {formatDate(item.createdAt)}</Text>
+                  )}
+
+                  {item.deliveryDate ? (
+                    <Text style={styles.deliveryDateText}>
+                      📅 Доставка: {item.deliveryDate.split('-').reverse().join('.')}
+                    </Text>
+                  ) : null}
+
+                  {item.deliveryAddress ? (
+                    <Text style={styles.address} numberOfLines={1}>
+                      📍 {item.deliveryAddress}
+                    </Text>
+                  ) : null}
+
+                  {item.comment ? (
+                    <Text style={styles.commentText} numberOfLines={2}>
+                      💬 {item.comment}
+                    </Text>
+                  ) : null}
+
+                  <View style={styles.cardBottom}>
+                    <Text style={styles.itemsCount}>Позиций: {item.items.length}</Text>
+                    <Text style={styles.amount}>{item.totalAmount.toFixed(2)} ₽</Text>
                   </View>
-                </View>
-
-                {item.completedAt ? (
-                  <Text style={styles.completedDateText}>
-                    ✅ Завершен: {formatDate(item.completedAt)}
-                  </Text>
-                ) : (
-                  <Text style={styles.date}>Создан: {formatDate(item.createdAt)}</Text>
-                )}
-
-                {item.deliveryDate ? (
-                  <Text style={styles.deliveryDateText}>
-                    📅 Доставка: {item.deliveryDate.split('-').reverse().join('.')}
-                  </Text>
-                ) : null}
-
-                {item.deliveryAddress ? (
-                  <Text style={styles.address} numberOfLines={1}>
-                    📍 {item.deliveryAddress}
-                  </Text>
-                ) : null}
-
-                {item.comment ? (
-                  <Text style={styles.commentText} numberOfLines={2}>
-                    💬 {item.comment}
-                  </Text>
-                ) : null}
-
-                <View style={styles.cardBottom}>
-                  <Text style={styles.itemsCount}>Позиций: {item.items.length}</Text>
-                  <Text style={styles.amount}>{item.totalAmount.toFixed(2)} ₽</Text>
-                </View>
-              </TouchableOpacity>
+                </TouchableOpacity>
+              </View>
             );
           }}
         />
@@ -295,6 +409,62 @@ const styles = StyleSheet.create({
   filterTextActive: {
     color: theme.colors.white,
   },
+  batchBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderColor: '#ECE7DC',
+  },
+  selectAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  selectAllText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.textMain,
+    marginLeft: 8,
+  },
+  deleteBatchBtn: {
+    backgroundColor: '#D9534F',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: theme.radius.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  deleteBatchBtnDisabled: {
+    opacity: 0.6,
+  },
+  deleteBatchText: {
+    color: theme.colors.white,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#B0A795',
+    backgroundColor: theme.colors.cardBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  checkmark: {
+    color: theme.colors.white,
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 16,
+  },
   list: {
     padding: theme.spacing.md,
   },
@@ -305,6 +475,29 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
     borderWidth: 1,
     borderColor: theme.colors.border,
+  },
+  cardSelected: {
+    borderColor: theme.colors.primary,
+    backgroundColor: '#F7FAF7',
+    borderWidth: 1.5,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  cardCheckboxTouchable: {
+    marginRight: 10,
+    padding: 2,
+  },
+  cardTitleTouchable: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cardBodyTouchable: {
+    paddingLeft: 34, // Отступ, выравнивающий текст по названию заказчика
   },
   cardTop: {
     flexDirection: 'row',

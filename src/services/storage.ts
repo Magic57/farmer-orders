@@ -288,6 +288,23 @@ export const StorageService = {
     }
   },
 
+  async deleteOrdersBatch(ids: string[]): Promise<void> {
+    try {
+      if (!ids || ids.length === 0) return;
+      const idsSet = new Set(ids);
+      // Удаляем из Firestore параллельно
+      await Promise.allSettled(ids.map((id) => deleteDoc(doc(db, 'orders', id))));
+
+      // Удаляем из локального AsyncStorage
+      const orders = await this.getOrders();
+      const filtered = orders.filter((o) => !idsSet.has(o.id));
+      await AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(filtered));
+    } catch (e) {
+      console.error('Ошибка массового удаления заказов:', e);
+      throw e;
+    }
+  },
+
   // === КЛИЕНТЫ ===
   async getCustomers(): Promise<Customer[]> {
     try {
