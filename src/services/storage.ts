@@ -105,6 +105,27 @@ export const StorageService = {
     }
   },
 
+  async importOrders(importedList: Order[]): Promise<number> {
+    try {
+      const existing = await this.getOrders();
+      let addedCount = 0;
+      for (const item of importedList) {
+        const idx = existing.findIndex((e) => e.id === item.id);
+        if (idx >= 0) {
+          existing[idx] = item;
+        } else {
+          existing.unshift(item);
+          addedCount++;
+        }
+      }
+      await AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(existing));
+      return addedCount;
+    } catch (e) {
+      console.error('Ошибка импорта заказов:', e);
+      throw e;
+    }
+  },
+
   // --- Постоянные заказчики ---
   async getCustomers(): Promise<Customer[]> {
     try {

@@ -9,10 +9,14 @@ import {
   Modal,
   SafeAreaView,
   Linking,
+  ScrollView,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 import { Order, RootStackParamList } from '../types';
 import { StorageService } from '../services/storage';
 import { theme } from '../constants/theme';
@@ -24,6 +28,7 @@ export const DeliveryTodayScreen = () => {
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [formedOrders, setFormedOrders] = useState<Order[]>([]);
   const [addModalVisible, setAddModalVisible] = useState(false);
+  const [prepModalVisible, setPrepModalVisible] = useState(false);
 
   const loadData = async () => {
     const all = await StorageService.getOrders();
@@ -80,6 +85,113 @@ export const DeliveryTodayScreen = () => {
     );
   };
 
+  // Экспорт заказов в файл для мессенджера
+  const handleExportOrders = async () => {
+    if (activeOrders.length === 0) {
+      Alert.alert('Экспорт', 'Сначала добавьте заказы на развозку.');
+      return;
+    }
+
+    try {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const fileName = `razvozka_${todayStr}.json`;
+      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+
+      const payload = {
+        exportDate: todayStr,
+        version: '1.0',
+        orders: activeOrders,
+      };
+
+      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(payload, null, 2));
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'application/json',
+          dialogTitle: 'Отправить заказы на сборку',
+          UTI: 'public.json',
+        });
+      } else {
+        Alert.alert('Ошибка', 'Функция "Поделиться" недоступна на этом устройстве.');
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Ошибка экспорта', 'Не удалось экспортировать файл.');
+    }
+  };
+
+  // Импорт заказов из файла мессенджера на другом телефоне
+  const handleImportOrders = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: ['application/json', '*/*'],
+        copyToCacheDirectory: true,
+      });
+
+      if (res.canceled || !res.assets || res.assets.length === 0) {
+        return;
+      }
+
+      const file = res.assets[0];
+      const content = await FileSystem.readAsStringAsync(file.uri);
+      const parsed = JSON.parse(content);
+
+      let importedList: Order[] = [];
+      if (Array.isArray(parsed)) {
+        importedList = parsed;
+      } else if (parsed && Array.isArray(parsed.orders)) {
+        importedList = parsed.orders;
+      }
+
+      if (importedList.length === 0) {
+        Alert.alert('Ошибка', 'В выбранном файле нет подходящих заказов.');
+        return;
+      }
+
+      // Все импортированные заказы автоматически ставим в статус 'in_progress' (развозка)
+      const preparedList = importedList.map((o) => ({
+        ...o,
+        status: 'in_progress' as const,
+      }));
+
+      const added = await StorageService.importOrders(preparedList);
+      loadData();
+      Alert.alert(
+        'Успешный импорт! 🎉',
+        `Загружено заказов: ${preparedList.length} (новых добавлено: ${added}). Они готовы к сборке!`
+      );
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Ошибка импорта', 'Не удалось прочитать файл. Убедитесь, что это файл формата .json');
+    }
+  };
+
+  // Сводный перечень продуктов для сборщика (чтобы сразу видеть сколько всего собрать)
+  const getPrepSummary = () => {
+    const summary: Record<string, { name: string; unit: string; totalPieces: number; totalWeight: number }> = {};
+    for (const order of activeOrders) {
+      for (const item of order.items) {
+        if (!summary[item.productId]) {
+          summary[item.productId] = {
+            name: item.productName,
+            unit: item.unit,
+            totalPieces: 0,
+            totalWeight: 0,
+          };
+        }
+        if (item.piecesCount) {
+          summary[item.productId].totalPieces += item.piecesCount;
+        } else if (item.unit === 'piece') {
+          summary[item.productId].totalPieces += item.quantity;
+        }
+        if (item.actualWeight && item.actualWeight > 0) {
+          summary[item.productId].totalWeight += item.actualWeight;
+        }
+      }
+    }
+    return Object.values(summary);
+  };
+
   const totalDeliverySum = activeOrders.reduce((sum, o) => sum + o.totalAmount, 0);
 
   return (
@@ -95,8 +207,25 @@ export const DeliveryTodayScreen = () => {
           style={styles.addBtn}
           onPress={() => setAddModalVisible(true)}
         >
-          <Text style={styles.addBtnText}>+ Выбрать заказ</Text>
+          <Text style={styles.addBtnText}>+ Заказ</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Панель экспорта, импорта и листа сборки */}
+      <View style={styles.syncBar}>
+        <TouchableOpacity style={styles.syncBtn} onPress={handleExportOrders}>
+          <Text style={styles.syncBtnText}>📤 Экспорт в мессенджер</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.syncBtn, styles.importBtn]} onPress={handleImportOrders}>
+          <Text style={styles.importBtnText}>📥 Импорт файла</Text>
+        </TouchableOpacity>
+
+        {activeOrders.length > 0 && (
+          <TouchableOpacity style={[styles.syncBtn, styles.prepBtn]} onPress={() => setPrepModalVisible(true)}>
+            <Text style={styles.prepBtnText}>📋 Лист сборки</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {activeOrders.length === 0 ? (
@@ -104,7 +233,7 @@ export const DeliveryTodayScreen = () => {
           <Text style={styles.emptyIcon}>🚚</Text>
           <Text style={styles.emptyTitle}>На сегодня нет заказов в работе</Text>
           <Text style={styles.emptySubtitle}>
-            Нажмите «+ Выбрать заказ», чтобы добавить сформированные заказы в сегодняшний маршрут.
+            Нажмите «+ Заказ» для добавления из сформированных, либо нажмите «📥 Импорт файла», если коллега прислал список из мессенджера!
           </Text>
         </View>
       ) : (
@@ -234,6 +363,34 @@ export const DeliveryTodayScreen = () => {
           )}
         </SafeAreaView>
       </Modal>
+
+      {/* Модальное окно Листа сборки для заготовителя/сборщика */}
+      <Modal visible={prepModalVisible} animationType="slide">
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>📋 Сводный лист сборки</Text>
+            <TouchableOpacity onPress={() => setPrepModalVisible(false)} style={styles.modalCloseBtn}>
+              <Text style={styles.modalCloseText}>Закрыть</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView contentContainerStyle={styles.prepContent}>
+            <Text style={styles.prepSubtitle}>
+              Сколько всего товаров нужно собрать и передать развозчику:
+            </Text>
+
+            {getPrepSummary().map((prod, idx) => (
+              <View key={idx} style={styles.prepRow}>
+                <Text style={styles.prepProdName}>• {prod.name}</Text>
+                <Text style={styles.prepProdQty}>
+                  {prod.totalPieces > 0 ? `${prod.totalPieces} шт ` : ''}
+                  {prod.totalWeight > 0 ? `(${prod.totalWeight.toFixed(3)} кг)` : ''}
+                </Text>
+              </View>
+            ))}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </View>
   );
 };
@@ -274,6 +431,49 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 13,
   },
+  syncBar: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.cardBg,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderColor: theme.colors.border,
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+  },
+  syncBtn: {
+    backgroundColor: '#FAF8F5',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: theme.radius.sm,
+    marginRight: 6,
+    marginVertical: 2,
+  },
+  syncBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.textMain,
+  },
+  importBtn: {
+    backgroundColor: '#E8F5E9',
+    borderColor: theme.colors.primary,
+  },
+  importBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.primary,
+  },
+  prepBtn: {
+    backgroundColor: '#FFF3E0',
+    borderColor: '#E67E22',
+  },
+  prepBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#D35400',
+  },
   list: {
     padding: theme.spacing.md,
   },
@@ -307,12 +507,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     overflow: 'hidden',
   },
-  deliveryDateText: {
-    fontSize: 13,
-    color: theme.colors.primary,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
   phoneContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -334,6 +528,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.colors.primary,
     fontWeight: '600',
+  },
+  deliveryDateText: {
+    fontSize: 13,
+    color: theme.colors.primary,
+    fontWeight: '600',
+    marginBottom: 4,
   },
   address: {
     fontSize: 13,
@@ -494,5 +694,35 @@ const styles = StyleSheet.create({
     color: theme.colors.white,
     fontWeight: '700',
     fontSize: 13,
+  },
+  prepContent: {
+    padding: theme.spacing.md,
+  },
+  prepSubtitle: {
+    fontSize: 14,
+    color: theme.colors.textMuted,
+    marginBottom: 16,
+  },
+  prepRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: theme.colors.cardBg,
+    padding: 14,
+    borderRadius: theme.radius.md,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  prepProdName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.colors.textMain,
+    flex: 1,
+  },
+  prepProdQty: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: theme.colors.primary,
   },
 });
