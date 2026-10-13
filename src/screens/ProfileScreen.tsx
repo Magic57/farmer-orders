@@ -13,7 +13,7 @@ import { theme } from '../constants/theme';
 
 export const ProfileScreen = () => {
   const insets = useSafeAreaInsets();
-  const { user, logout } = useAuth();
+  const { user, logout, changeRole } = useAuth();
 
   const handleShareCode = async () => {
     if (!user?.inviteCode) return;
@@ -72,9 +72,9 @@ export const ProfileScreen = () => {
           </Text>
         </View>
 
-        {/* Карточка пользователя */}
+        {/* Карточка пользователя и роли */}
         <View style={styles.card}>
-          <Text style={styles.cardSectionTitle}>👤 Данные сотрудника</Text>
+          <Text style={styles.cardSectionTitle}>👤 Данные и текущая роль</Text>
           <View style={styles.row}>
             <Text style={styles.label}>Имя:</Text>
             <Text style={styles.val}>{user?.name}</Text>
@@ -83,9 +83,61 @@ export const ProfileScreen = () => {
             <Text style={styles.label}>Email:</Text>
             <Text style={styles.val}>{user?.email}</Text>
           </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Роль:</Text>
-            <Text style={[styles.val, styles.roleVal]}>{getRoleLabel(user?.role)}</Text>
+
+          <Text style={[styles.cardSectionTitle, { marginTop: 14, marginBottom: 8 }]}>
+            🔄 Быстрое переключение роли:
+          </Text>
+          <View style={styles.roleButtonsRow}>
+            <TouchableOpacity
+              style={[
+                styles.roleSwitchBtn,
+                user?.role === 'manager' && styles.roleSwitchBtnActive,
+              ]}
+              onPress={() => changeRole('manager')}
+            >
+              <Text
+                style={[
+                  styles.roleSwitchText,
+                  user?.role === 'manager' && styles.roleSwitchTextActive,
+                ]}
+              >
+                📝 Диспетчер
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.roleSwitchBtn,
+                user?.role === 'courier' && styles.roleSwitchBtnActive,
+              ]}
+              onPress={() => changeRole('courier')}
+            >
+              <Text
+                style={[
+                  styles.roleSwitchText,
+                  user?.role === 'courier' && styles.roleSwitchTextActive,
+                ]}
+              >
+                🚚 Развозчик
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.roleSwitchBtn,
+                user?.role === 'picker' && styles.roleSwitchBtnActive,
+              ]}
+              onPress={() => changeRole('picker')}
+            >
+              <Text
+                style={[
+                  styles.roleSwitchText,
+                  user?.role === 'picker' && styles.roleSwitchTextActive,
+                ]}
+              >
+                📦 Сборщик
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -209,5 +261,33 @@ const styles = StyleSheet.create({
     color: theme.colors.danger,
     fontWeight: '700',
     fontSize: 15,
+  },
+  roleButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  roleSwitchBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    marginHorizontal: 3,
+    backgroundColor: '#FAF8F5',
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    alignItems: 'center',
+  },
+  roleSwitchBtnActive: {
+    backgroundColor: '#E8F5E9',
+    borderColor: theme.colors.primary,
+  },
+  roleSwitchText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.colors.textMuted,
+  },
+  roleSwitchTextActive: {
+    color: theme.colors.primary,
+    fontWeight: '800',
   },
 });

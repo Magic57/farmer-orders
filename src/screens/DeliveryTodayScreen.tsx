@@ -32,6 +32,16 @@ export const DeliveryTodayScreen = () => {
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [prepModalVisible, setPrepModalVisible] = useState(false);
 
+  // Режим экрана: для роли courier всегда включен упрощенный режим, а диспетчер может переключать тумблером
+  const [driverMode, setDriverMode] = useState<boolean>(user?.role === 'courier');
+
+  // Если роль пользователя изменилась, синхронизируем дефолт
+  useEffect(() => {
+    if (user?.role === 'courier') {
+      setDriverMode(true);
+    }
+  }, [user?.role]);
+
   useEffect(() => {
     const unsubscribe = StorageService.subscribeOrders(user?.farmId || '', (all) => {
       setActiveOrders(all.filter((o) => o.status === 'in_progress'));
@@ -189,38 +199,64 @@ export const DeliveryTodayScreen = () => {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 16) + 8 }]}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.title}>
-            {user?.role === 'picker' ? 'Сборка заказов 📦' : 'Развозка сегодня 🚚'}
+            {driverMode ? 'Маршрут доставки 🚗' : (user?.role === 'picker' ? 'Сборка заказов 📦' : 'Развозка сегодня 🚚')}
           </Text>
           <Text style={styles.subtitle}>
             В работе: {activeOrders.length} | Итого: {totalDeliverySum.toFixed(2)} ₽
           </Text>
         </View>
-        <TouchableOpacity
-          style={styles.addBtn}
-          onPress={() => setAddModalVisible(true)}
-        >
-          <Text style={styles.addBtnText}>+ Заказ</Text>
-        </TouchableOpacity>
-      </View>
 
-      {/* Панель экспорта, импорта и листа сборки */}
-      <View style={styles.syncBar}>
-        <TouchableOpacity style={styles.syncBtn} onPress={handleExportOrders}>
-          <Text style={styles.syncBtnText}>📤 Экспорт в мессенджер</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.syncBtn, styles.importBtn]} onPress={handleImportOrders}>
-          <Text style={styles.importBtnText}>📥 Импорт файла</Text>
-        </TouchableOpacity>
-
-        {activeOrders.length > 0 && (
-          <TouchableOpacity style={[styles.syncBtn, styles.prepBtn]} onPress={() => setPrepModalVisible(true)}>
-            <Text style={styles.prepBtnText}>📋 Лист сборки</Text>
+        {!driverMode && (
+          <TouchableOpacity
+            style={styles.addBtn}
+            onPress={() => setAddModalVisible(true)}
+          >
+            <Text style={styles.addBtnText}>+ Заказ</Text>
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Тумблер переключения режимов «Диспетчер» / «Развозчик» */}
+      <View style={styles.modeToggleBar}>
+        <TouchableOpacity
+          style={[styles.modeToggleTab, !driverMode && styles.modeToggleTabActive]}
+          onPress={() => setDriverMode(false)}
+        >
+          <Text style={[styles.modeToggleText, !driverMode && styles.modeToggleTextActive]}>
+            📝 Режим «Диспетчер»
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.modeToggleTab, driverMode && styles.modeToggleTabActive]}
+          onPress={() => setDriverMode(true)}
+        >
+          <Text style={[styles.modeToggleText, driverMode && styles.modeToggleTextActive]}>
+            🚗 Режим «Развозчик»
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Панель экспорта, импорта и листа сборки (скрыта в режиме чистого развозчика для чистоты) */}
+      {!driverMode && (
+        <View style={styles.syncBar}>
+          <TouchableOpacity style={styles.syncBtn} onPress={handleExportOrders}>
+            <Text style={styles.syncBtnText}>📤 Экспорт в мессенджер</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.syncBtn, styles.importBtn]} onPress={handleImportOrders}>
+            <Text style={styles.importBtnText}>📥 Импорт файла</Text>
+          </TouchableOpacity>
+
+          {activeOrders.length > 0 && (
+            <TouchableOpacity style={[styles.syncBtn, styles.prepBtn]} onPress={() => setPrepModalVisible(true)}>
+              <Text style={styles.prepBtnText}>📋 Лист сборки</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {activeOrders.length === 0 ? (
         <View style={styles.emptyContainer}>
@@ -235,74 +271,140 @@ export const DeliveryTodayScreen = () => {
           data={activeOrders}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
-          renderItem={({ item, index }) => (
-            <View style={styles.card}>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('EditOrder', { orderId: item.id })}
-                activeOpacity={0.7}
-              >
-                <View style={styles.cardTop}>
-                  <Text style={styles.orderNumber}>#{index + 1} {item.customerName}</Text>
-                  <Text style={styles.statusBadge}>В РАБОТЕ</Text>
-                </View>
+          renderItem={({ item, index }) => {
+            if (driverMode) {
+              // === РЕЖИМ «РАЗВОЗЧИК» (Крупные кнопки, адрес, звонок в 1 тап, доставка) ===
+              return (
+                <View style={styles.driverCard}>
+                  <View style={styles.driverCardHeader}>
+                    <Text style={styles.driverOrderNum}>Остановка #{index + 1}</Text>
+                    <Text style={styles.driverAmount}>{item.totalAmount.toFixed(0)} ₽</Text>
+                  </View>
 
-                {item.customerPhone ? (
+                  <Text style={styles.driverCustomerName}>{item.customerName}</Text>
+
+                  {/* Крупный адрес доставки */}
+                  {item.deliveryAddress ? (
+                    <View style={styles.driverAddressBox}>
+                      <Text style={styles.driverAddressIcon}>📍</Text>
+                      <Text style={styles.driverAddressText}>{item.deliveryAddress}</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.driverNoAddress}>Адрес не указан (самовывоз/уточнить)</Text>
+                  )}
+
+                  {/* Огромная кнопка быстрого звонка клиенту */}
+                  {item.customerPhone ? (
+                    <TouchableOpacity
+                      style={styles.driverCallBtn}
+                      onPress={() => Linking.openURL(`tel:${item.customerPhone}`)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.driverCallBtnIcon}>📞</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.driverCallBtnLabel}>Позвонить клиенту</Text>
+                        <Text style={styles.driverCallBtnPhone}>{item.customerPhone}</Text>
+                      </View>
+                      <Text style={styles.driverCallArrow}>➔</Text>
+                    </TouchableOpacity>
+                  ) : null}
+
+                  {/* Краткий перечень того, что отдать */}
+                  <View style={styles.driverItemsBox}>
+                    <Text style={styles.driverItemsLabel}>Отдать клиенту:</Text>
+                    <Text style={styles.driverItemsText}>
+                      {item.items.map((i) => {
+                        if (i.unit === 'kg') {
+                          const w = i.actualWeight && i.actualWeight > 0 ? `${i.actualWeight} кг` : `${i.quantity} кг`;
+                          return `• ${i.productName}: ${w}`;
+                        }
+                        return `• ${i.productName}: ${i.quantity} шт`;
+                      }).join('\n')}
+                    </Text>
+                  </View>
+
+                  {/* Огромная кнопка ДОСТАВЛЕНО */}
                   <TouchableOpacity
-                    style={styles.phoneContainer}
-                    onPress={() => Linking.openURL(`tel:${item.customerPhone}`)}
-                    activeOpacity={0.7}
+                    style={styles.driverCompleteBtn}
+                    onPress={() => handleCompleteOrder(item.id, item.customerName)}
+                    activeOpacity={0.8}
                   >
-                    <Text style={styles.phone}>📞 {item.customerPhone}</Text>
-                    <Text style={styles.callBadge}>Позвонить</Text>
+                    <Text style={styles.driverCompleteBtnText}>✓ ДОСТАВЛЕНО ({item.totalAmount.toFixed(0)} ₽)</Text>
                   </TouchableOpacity>
-                ) : null}
-
-                {item.deliveryDate ? (
-                  <Text style={styles.deliveryDateText}>
-                    📅 Доставка: {item.deliveryDate.split('-').reverse().join('.')}
-                  </Text>
-                ) : null}
-
-                {item.deliveryAddress ? (
-                  <Text style={styles.address}>📍 {item.deliveryAddress}</Text>
-                ) : null}
-
-                <View style={styles.itemsSummary}>
-                  <Text style={styles.itemsListText} numberOfLines={2}>
-                    {item.items.map((i) => {
-                      if (i.unit === 'kg') {
-                        const pieces = i.piecesCount ? `${i.piecesCount} шт` : '';
-                        const weight = i.actualWeight && i.actualWeight > 0 ? `${i.actualWeight} кг` : 'вес не указан';
-                        return `${i.productName} (${pieces ? pieces + ', ' : ''}${weight})`;
-                      }
-                      return `${i.productName} (${i.quantity} шт)`;
-                    }).join(', ')}
-                  </Text>
                 </View>
+              );
+            }
 
-                <View style={styles.amountRow}>
-                  <Text style={styles.amountLabel}>К оплате:</Text>
-                  <Text style={styles.amountValue}>{item.totalAmount.toFixed(2)} ₽</Text>
-                </View>
-              </TouchableOpacity>
-
-              <View style={styles.cardActions}>
+            // === РЕЖИМ «ДИСПЕТЧЕР» (Детальный вид, редактирование, откладывание) ===
+            return (
+              <View style={styles.card}>
                 <TouchableOpacity
-                  style={styles.returnBtn}
-                  onPress={() => handleReturnToFormed(item.id)}
+                  onPress={() => navigation.navigate('EditOrder', { orderId: item.id })}
+                  activeOpacity={0.7}
                 >
-                  <Text style={styles.returnBtnText}>Отложить</Text>
+                  <View style={styles.cardTop}>
+                    <Text style={styles.orderNumber}>#{index + 1} {item.customerName}</Text>
+                    <Text style={styles.statusBadge}>В РАБОТЕ</Text>
+                  </View>
+
+                  {item.customerPhone ? (
+                    <TouchableOpacity
+                      style={styles.phoneContainer}
+                      onPress={() => Linking.openURL(`tel:${item.customerPhone}`)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.phone}>📞 {item.customerPhone}</Text>
+                      <Text style={styles.callBadge}>Позвонить</Text>
+                    </TouchableOpacity>
+                  ) : null}
+
+                  {item.deliveryDate ? (
+                    <Text style={styles.deliveryDateText}>
+                      📅 Доставка: {item.deliveryDate.split('-').reverse().join('.')}
+                    </Text>
+                  ) : null}
+
+                  {item.deliveryAddress ? (
+                    <Text style={styles.address}>📍 {item.deliveryAddress}</Text>
+                  ) : null}
+
+                  <View style={styles.itemsSummary}>
+                    <Text style={styles.itemsListText} numberOfLines={2}>
+                      {item.items.map((i) => {
+                        if (i.unit === 'kg') {
+                          const pieces = i.piecesCount ? `${i.piecesCount} шт` : '';
+                          const weight = i.actualWeight && i.actualWeight > 0 ? `${i.actualWeight} кг` : 'вес не указан';
+                          return `${i.productName} (${pieces ? pieces + ', ' : ''}${weight})`;
+                        }
+                        return `${i.productName} (${i.quantity} шт)`;
+                      }).join(', ')}
+                    </Text>
+                  </View>
+
+                  <View style={styles.amountRow}>
+                    <Text style={styles.amountLabel}>К оплате:</Text>
+                    <Text style={styles.amountValue}>{item.totalAmount.toFixed(2)} ₽</Text>
+                  </View>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.completeBtn}
-                  onPress={() => handleCompleteOrder(item.id, item.customerName)}
-                >
-                  <Text style={styles.completeBtnText}>✓ Завершен</Text>
-                </TouchableOpacity>
+                <View style={styles.cardActions}>
+                  <TouchableOpacity
+                    style={styles.returnBtn}
+                    onPress={() => handleReturnToFormed(item.id)}
+                  >
+                    <Text style={styles.returnBtnText}>Отложить</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.completeBtn}
+                    onPress={() => handleCompleteOrder(item.id, item.customerName)}
+                  >
+                    <Text style={styles.completeBtnText}>✓ Завершен</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          )}
+            );
+          }}
         />
       )}
 
@@ -718,5 +820,169 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: theme.colors.primary,
+  },
+
+  /* Стили для тумблера режимов */
+  modeToggleBar: {
+    flexDirection: 'row',
+    backgroundColor: '#EBE5D8',
+    padding: 4,
+    marginHorizontal: theme.spacing.md,
+    marginTop: 8,
+    marginBottom: 4,
+    borderRadius: theme.radius.md,
+  },
+  modeToggleTab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: theme.radius.sm,
+  },
+  modeToggleTabActive: {
+    backgroundColor: theme.colors.cardBg,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  modeToggleText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.colors.textMuted,
+  },
+  modeToggleTextActive: {
+    color: theme.colors.primary,
+    fontWeight: '800',
+  },
+
+  /* Стили для супер-удобной карточки «Развозчик» за рулем */
+  driverCard: {
+    backgroundColor: theme.colors.cardBg,
+    borderRadius: theme.radius.lg,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#D4C3A3',
+    elevation: 3,
+  },
+  driverCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderColor: '#F0ECE1',
+    paddingBottom: 8,
+    marginBottom: 8,
+  },
+  driverOrderNum: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: theme.colors.accent,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  driverAmount: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: theme.colors.primary,
+  },
+  driverCustomerName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: theme.colors.textMain,
+    marginBottom: 10,
+  },
+  driverAddressBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF9E6',
+    borderWidth: 1,
+    borderColor: '#F3E5AB',
+    borderRadius: theme.radius.md,
+    padding: 12,
+    marginBottom: 12,
+  },
+  driverAddressIcon: {
+    fontSize: 24,
+    marginRight: 10,
+  },
+  driverAddressText: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#5C4018',
+    lineHeight: 22,
+  },
+  driverNoAddress: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    color: theme.colors.textMuted,
+    marginBottom: 12,
+  },
+  driverCallBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    borderWidth: 2,
+    borderColor: '#2D5A27',
+    borderRadius: theme.radius.md,
+    padding: 14,
+    marginBottom: 12,
+  },
+  driverCallBtnIcon: {
+    fontSize: 26,
+    marginRight: 12,
+  },
+  driverCallBtnLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2D5A27',
+    textTransform: 'uppercase',
+  },
+  driverCallBtnPhone: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1B4316',
+    marginTop: 2,
+  },
+  driverCallArrow: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2D5A27',
+  },
+  driverItemsBox: {
+    backgroundColor: '#FAF8F5',
+    padding: 12,
+    borderRadius: theme.radius.sm,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  driverItemsLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.textMuted,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  driverItemsText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.colors.textMain,
+    lineHeight: 22,
+  },
+  driverCompleteBtn: {
+    backgroundColor: theme.colors.primary,
+    paddingVertical: 16,
+    borderRadius: theme.radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+  },
+  driverCompleteBtnText: {
+    color: theme.colors.white,
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
 });

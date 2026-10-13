@@ -41,8 +41,8 @@ function MainTabs() {
         },
       }}
     >
-      {/* Диспетчер видит каталог и новый заказ */}
-      {!isCourier && (
+      {/* Диспетчер видит весь функционал (каталог, новый заказ, развозку, историю, профиль) */}
+      {!isCourier && !isPicker && (
         <Tab.Screen
           name="Products"
           component={ProductsScreen}
@@ -53,7 +53,7 @@ function MainTabs() {
         />
       )}
 
-      {!isPicker && !isCourier && (
+      {!isCourier && !isPicker && (
         <Tab.Screen
           name="NewOrder"
           component={NewOrderScreen}

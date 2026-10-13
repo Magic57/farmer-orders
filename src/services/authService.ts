@@ -131,4 +131,8 @@ export const AuthService = {
   async logout(): Promise<void> {
     await signOut(auth);
   },
+
+  async updateUserRole(uid: string, role: UserRole): Promise<void> {
+    await setDoc(doc(db, 'users', uid), { role }, { merge: true });
+  },
 };

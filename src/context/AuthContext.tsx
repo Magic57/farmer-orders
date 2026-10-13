@@ -10,6 +10,7 @@ interface AuthContextType {
   registerJoinFarm: (email: string, pass: string, name: string, inviteCode: string, role: UserRole) => Promise<void>;
   logout: () => Promise<void>;
   reloadProfile: () => Promise<void>;
+  changeRole: (role: UserRole) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -71,6 +72,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const changeRole = async (newRole: UserRole) => {
+    if (user?.uid) {
+      await AuthService.updateUserRole(user.uid, newRole);
+      setUser((prev) => (prev ? { ...prev, role: newRole } : null));
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -81,6 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         registerJoinFarm,
         logout,
         reloadProfile,
+        changeRole,
       }}
     >
       {children}
