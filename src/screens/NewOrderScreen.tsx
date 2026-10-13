@@ -16,11 +16,13 @@ import { OrderItemCard } from '../components/OrderItemCard';
 import { SelectProductModal } from '../components/SelectProductModal';
 import { SelectCustomerModal } from '../components/SelectCustomerModal';
 import { DatePickerModal } from '../components/DatePickerModal';
+import { useAuth } from '../context/AuthContext';
 import { theme } from '../constants/theme';
 
 export const NewOrderScreen = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const { user } = useAuth();
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
@@ -33,19 +35,13 @@ export const NewOrderScreen = () => {
   const [dateModalVisible, setDateModalVisible] = useState(false);
 
   useEffect(() => {
-    loadCatalog();
-    loadCustomers();
-  }, [productModalVisible, customerModalVisible]);
-
-  const loadCatalog = async () => {
-    const products = await StorageService.getProducts();
-    setCatalog(products);
-  };
-
-  const loadCustomers = async () => {
-    const list = await StorageService.getCustomers();
-    setCustomers(list);
-  };
+    const unsubProducts = StorageService.subscribeProducts(user?.farmId || '', setCatalog);
+    const unsubCustomers = StorageService.subscribeCustomers(user?.farmId || '', setCustomers);
+    return () => {
+      unsubProducts();
+      unsubCustomers();
+    };
+  }, [user?.farmId]);
 
   const handleSelectCustomer = (customer: Customer) => {
     setCustomerName(customer.name);
@@ -54,8 +50,7 @@ export const NewOrderScreen = () => {
   };
 
   const handleSaveCustomer = async (updated: Customer) => {
-    await StorageService.saveCustomer(updated);
-    loadCustomers();
+    await StorageService.saveCustomer(updated, user?.farmId);
     if (customerName === updated.name) {
       setCustomerPhone(updated.phone);
       setDeliveryAddress(updated.address);
@@ -134,9 +129,10 @@ export const NewOrderScreen = () => {
       name: customerName.trim(),
       phone: customerPhone.trim(),
       address: deliveryAddress.trim(),
+      farmId: user?.farmId || '',
       createdAt: Date.now(),
     };
-    await StorageService.saveCustomer(customerToSave);
+    await StorageService.saveCustomer(customerToSave, user?.farmId);
 
     const newOrder: Order = {
       id: Date.now().toString(),
@@ -147,10 +143,11 @@ export const NewOrderScreen = () => {
       items,
       totalAmount: parseFloat(totalOrderAmount.toFixed(2)),
       status: 'formed',
+      farmId: user?.farmId || '',
       createdAt: Date.now(),
     };
 
-    await StorageService.saveOrder(newOrder);
+    await StorageService.saveOrder(newOrder, user?.farmId);
     Alert.alert('Успешно', 'Заказ сформирован!', [
       {
         text: 'OK',

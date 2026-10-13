@@ -13,9 +13,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Product, UnitType } from '../types';
 import { StorageService } from '../services/storage';
+import { useAuth } from '../context/AuthContext';
 import { theme } from '../constants/theme';
 
 export const EditProductScreen = () => {
+  const { user } = useAuth();
   const route = useRoute<any>();
   const navigation = useNavigation();
   const existingProduct: Product | undefined = route.params?.product;
@@ -62,10 +64,11 @@ export const EditProductScreen = () => {
       unit,
       pricePerUnit: parsedPrice,
       imageUri,
+      farmId: user?.farmId || '',
       createdAt: existingProduct?.createdAt || Date.now(),
     };
 
-    await StorageService.saveProduct(productToSave);
+    await StorageService.saveProduct(productToSave, user?.farmId);
     navigation.goBack();
   };
 

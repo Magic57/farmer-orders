@@ -12,10 +12,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Order, RootStackParamList } from '../types';
 import { StorageService } from '../services/storage';
 import { DateRangePickerModal } from '../components/DateRangePickerModal';
+import { useAuth } from '../context/AuthContext';
 import { theme } from '../constants/theme';
 
 export const OrderHistoryScreen = () => {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filter, setFilter] = useState<'all' | 'completed' | 'formed'>('all');
   const [startDate, setStartDate] = useState<string>('');
@@ -24,16 +26,12 @@ export const OrderHistoryScreen = () => {
 
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  const loadOrders = async () => {
-    const list = await StorageService.getOrders();
-    setOrders(list);
-  };
-
-  useFocusEffect(
-    useCallback(() => {
-      loadOrders();
-    }, [])
-  );
+  useEffect(() => {
+    const unsubscribe = StorageService.subscribeOrders(user?.farmId || '', (list) => {
+      setOrders(list);
+    });
+    return unsubscribe;
+  }, [user?.farmId]);
 
   const formatDate = (timestamp: number) => {
     const d = new Date(timestamp);

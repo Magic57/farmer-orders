@@ -3,23 +3,31 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text } from 'react-native';
+import { Text, View, ActivityIndicator } from 'react-native';
 
 import { RootStackParamList, MainTabParamList } from './src/types';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { AuthScreen } from './src/screens/AuthScreen';
 import { ProductsScreen } from './src/screens/ProductsScreen';
 import { EditProductScreen } from './src/screens/EditProductScreen';
 import { NewOrderScreen } from './src/screens/NewOrderScreen';
 import { DeliveryTodayScreen } from './src/screens/DeliveryTodayScreen';
 import { EditOrderScreen } from './src/screens/EditOrderScreen';
 import { OrderHistoryScreen } from './src/screens/OrderHistoryScreen';
+import { ProfileScreen } from './src/screens/ProfileScreen';
 import { theme } from './src/constants/theme';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 function MainTabs() {
+  const { user } = useAuth();
+  const isPicker = user?.role === 'picker';
+  const isCourier = user?.role === 'courier';
+
   return (
     <Tab.Navigator
+      initialRouteName={isCourier || isPicker ? 'DeliveryToday' : 'Products'}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: theme.colors.primary,
@@ -33,43 +41,75 @@ function MainTabs() {
         },
       }}
     >
-      <Tab.Screen
-        name="Products"
-        component={ProductsScreen}
-        options={{
-          tabBarLabel: 'Каталог',
-          tabBarIcon: () => <Text style={{ fontSize: 18 }}>🥬</Text>,
-        }}
-      />
-      <Tab.Screen
-        name="NewOrder"
-        component={NewOrderScreen}
-        options={{
-          tabBarLabel: 'Новый заказ',
-          tabBarIcon: () => <Text style={{ fontSize: 18 }}>🛒</Text>,
-        }}
-      />
+      {/* Диспетчер видит каталог и новый заказ */}
+      {!isCourier && (
+        <Tab.Screen
+          name="Products"
+          component={ProductsScreen}
+          options={{
+            tabBarLabel: 'Каталог',
+            tabBarIcon: () => <Text style={{ fontSize: 18 }}>🥬</Text>,
+          }}
+        />
+      )}
+
+      {!isPicker && !isCourier && (
+        <Tab.Screen
+          name="NewOrder"
+          component={NewOrderScreen}
+          options={{
+            tabBarLabel: 'Новый заказ',
+            tabBarIcon: () => <Text style={{ fontSize: 18 }}>🛒</Text>,
+          }}
+        />
+      )}
+
+      {/* Вкладка Развозка/Сборка видна всем ролям */}
       <Tab.Screen
         name="DeliveryToday"
         component={DeliveryTodayScreen}
         options={{
-          tabBarLabel: 'Развозка',
-          tabBarIcon: () => <Text style={{ fontSize: 18 }}>🚚</Text>,
+          tabBarLabel: isPicker ? 'Сборка' : 'Развозка',
+          tabBarIcon: () => <Text style={{ fontSize: 18 }}>{isPicker ? '📦' : '🚚'}</Text>,
         }}
       />
+
       <Tab.Screen
         name="OrderHistory"
         component={OrderHistoryScreen}
         options={{
           tabBarLabel: 'История',
-          tabBarIcon: () => <Text style={{ fontSize: 18 }}>📦</Text>,
+          tabBarIcon: () => <Text style={{ fontSize: 18 }}>📋</Text>,
+        }}
+      />
+
+      {/* Профиль и код хозяйства */}
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          tabBarLabel: 'Ферма',
+          tabBarIcon: () => <Text style={{ fontSize: 18 }}>🏡</Text>,
         }}
       />
     </Tab.Navigator>
   );
 }
 
-export default function App() {
+function NavigationRoot() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background }}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={{ marginTop: 12, color: theme.colors.primary, fontWeight: '600' }}>
+          Загрузка фермерской сети...
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer>
       <StatusBar style="dark" />
@@ -84,24 +124,42 @@ export default function App() {
           },
         }}
       >
-        <Stack.Screen
-          name="MainTabs"
-          component={MainTabs}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="EditProduct"
-          component={EditProductScreen}
-          options={({ route }) => ({
-            title: route.params?.product ? 'Редактировать товар' : 'Новый товар',
-          })}
-        />
-        <Stack.Screen
-          name="EditOrder"
-          component={EditOrderScreen}
-          options={{ title: 'Детали заказа' }}
-        />
+        {!user ? (
+          <Stack.Screen
+            name="Auth"
+            component={AuthScreen}
+            options={{ headerShown: false }}
+          />
+        ) : (
+          <>
+            <Stack.Screen
+              name="MainTabs"
+              component={MainTabs}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="EditProduct"
+              component={EditProductScreen}
+              options={({ route }) => ({
+                title: route.params?.product ? 'Редактировать товар' : 'Новый товар',
+              })}
+            />
+            <Stack.Screen
+              name="EditOrder"
+              component={EditOrderScreen}
+              options={{ title: 'Детали заказа' }}
+            />
+          </>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <NavigationRoot />
+    </AuthProvider>
   );
 }

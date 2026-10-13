@@ -19,30 +19,26 @@ import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { Order, RootStackParamList } from '../types';
 import { StorageService } from '../services/storage';
+import { useAuth } from '../context/AuthContext';
 import { theme } from '../constants/theme';
 
 export const DeliveryTodayScreen = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { user } = useAuth();
 
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [formedOrders, setFormedOrders] = useState<Order[]>([]);
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [prepModalVisible, setPrepModalVisible] = useState(false);
 
-  const loadData = async () => {
-    const all = await StorageService.getOrders();
-    // Заказы "в работе" (на развозку сегодня)
-    setActiveOrders(all.filter((o) => o.status === 'in_progress'));
-    // Заказы со статусом "сформирован" (доступные для выбора на развозку)
-    setFormedOrders(all.filter((o) => o.status === 'formed'));
-  };
-
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-    }, [])
-  );
+  useEffect(() => {
+    const unsubscribe = StorageService.subscribeOrders(user?.farmId || '', (all) => {
+      setActiveOrders(all.filter((o) => o.status === 'in_progress'));
+      setFormedOrders(all.filter((o) => o.status === 'formed'));
+    });
+    return unsubscribe;
+  }, [user?.farmId]);
 
   const handlePickOrder = async (orderId: string) => {
     await StorageService.updateOrderStatus(orderId, 'in_progress');

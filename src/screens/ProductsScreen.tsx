@@ -13,23 +13,21 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Product, RootStackParamList } from '../types';
 import { StorageService } from '../services/storage';
 import { ProductCard } from '../components/ProductCard';
+import { useAuth } from '../context/AuthContext';
 import { theme } from '../constants/theme';
 
 export const ProductsScreen = () => {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-  const loadProducts = async () => {
-    const list = await StorageService.getProducts();
-    setProducts(list);
-  };
-
-  useFocusEffect(
-    useCallback(() => {
-      loadProducts();
-    }, [])
-  );
+  useEffect(() => {
+    const unsubscribe = StorageService.subscribeProducts(user?.farmId || '', (list) => {
+      setProducts(list);
+    });
+    return unsubscribe;
+  }, [user?.farmId]);
 
   return (
     <View style={styles.container}>

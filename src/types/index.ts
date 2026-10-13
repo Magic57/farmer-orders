@@ -2,6 +2,26 @@ export type UnitType = 'piece' | 'kg';
 
 export type OrderStatus = 'formed' | 'in_progress' | 'completed';
 
+export type UserRole = 'manager' | 'picker' | 'courier'; // Диспетчер / Сборщик / Развозчик
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  farmId: string; // ID хозяйства
+  farmName: string;
+  inviteCode: string; // Код приглашения в хозяйство
+}
+
+export interface Farm {
+  id: string;
+  name: string;
+  inviteCode: string;
+  createdAt: number;
+  ownerUid: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -9,17 +29,18 @@ export interface Product {
   pricePerUnit: number;
   imageUri?: string;
   createdAt: number;
+  farmId?: string;
 }
 
 export interface OrderItem {
   id: string;
   productId: string;
   productName: string;
-  unit: UnitType; // исходная единица товара в каталоге
+  unit: UnitType;
   pricePerUnit: number;
-  piecesCount?: number; // количество штук (например: 2 кролика / 3 курицы)
-  actualWeight?: number; // фактический вес в кг при взвешивании (например: 4.155 кг)
-  quantity: number; // итоговое число для расчета цены (штуки или фактический вес)
+  piecesCount?: number;
+  actualWeight?: number;
+  quantity: number;
   totalPrice: number;
 }
 
@@ -28,12 +49,13 @@ export interface Order {
   customerName: string;
   customerPhone: string;
   deliveryAddress: string;
-  deliveryDate?: string; // Дата доставки (формат YYYY-MM-DD или DD.MM.YYYY)
+  deliveryDate?: string;
   items: OrderItem[];
   totalAmount: number;
   status: OrderStatus;
   createdAt: number;
   completedAt?: number;
+  farmId?: string;
 }
 
 export interface Customer {
@@ -42,9 +64,11 @@ export interface Customer {
   phone: string;
   address: string;
   createdAt: number;
+  farmId?: string;
 }
 
 export type RootStackParamList = {
+  Auth: undefined;
   MainTabs: undefined;
   EditProduct: { product?: Product };
   EditOrder: { orderId: string };
@@ -55,4 +79,5 @@ export type MainTabParamList = {
   NewOrder: undefined;
   DeliveryToday: undefined;
   OrderHistory: undefined;
+  Profile: undefined;
 };

@@ -15,9 +15,11 @@ import { OrderItemCard } from '../components/OrderItemCard';
 import { SelectProductModal } from '../components/SelectProductModal';
 import { SelectCustomerModal } from '../components/SelectCustomerModal';
 import { DatePickerModal } from '../components/DatePickerModal';
+import { useAuth } from '../context/AuthContext';
 import { theme } from '../constants/theme';
 
 export const EditOrderScreen = () => {
+  const { user } = useAuth();
   const route = useRoute<any>();
   const navigation = useNavigation();
   const orderId = route.params?.orderId;
@@ -36,9 +38,13 @@ export const EditOrderScreen = () => {
 
   useEffect(() => {
     loadOrder();
-    loadCatalog();
-    loadCustomers();
-  }, [orderId, productModalVisible, customerModalVisible]);
+    const unsubProducts = StorageService.subscribeProducts(user?.farmId || '', setCatalog);
+    const unsubCustomers = StorageService.subscribeCustomers(user?.farmId || '', setCustomers);
+    return () => {
+      unsubProducts();
+      unsubCustomers();
+    };
+  }, [orderId, user?.farmId]);
 
   const loadOrder = async () => {
     if (!orderId) return;
@@ -150,9 +156,10 @@ export const EditOrderScreen = () => {
       name: customerName.trim(),
       phone: customerPhone.trim(),
       address: deliveryAddress.trim(),
+      farmId: user?.farmId || '',
       createdAt: Date.now(),
     };
-    await StorageService.saveCustomer(customerToSave);
+    await StorageService.saveCustomer(customerToSave, user?.farmId);
 
     const updatedOrder: Order = {
       id: orderId,
@@ -163,10 +170,11 @@ export const EditOrderScreen = () => {
       items,
       totalAmount: parseFloat(totalOrderAmount.toFixed(2)),
       status: order?.status || 'formed',
+      farmId: user?.farmId || '',
       createdAt: order?.createdAt || Date.now(),
     };
 
-    await StorageService.saveOrder(updatedOrder);
+    await StorageService.saveOrder(updatedOrder, user?.farmId);
     Alert.alert('Готово', 'Изменения в заказе сохранены!', [
       { text: 'OK', onPress: () => navigation.goBack() },
     ]);
