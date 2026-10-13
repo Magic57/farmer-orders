@@ -21,9 +21,10 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 function MainTabs() {
-  const { user } = useAuth();
+  const { user, isDriverMode } = useAuth();
   const isPicker = user?.role === 'picker';
   const isCourier = user?.role === 'courier';
+  const showManagerTabs = !isPicker && (!isCourier || !isDriverMode);
 
   return (
     <Tab.Navigator
@@ -41,8 +42,8 @@ function MainTabs() {
         },
       }}
     >
-      {/* Диспетчер видит весь функционал (каталог, новый заказ, развозку, историю, профиль) */}
-      {!isCourier && !isPicker && (
+      {/* Диспетчер, а также Развозчик при переключении в режим Диспетчера видят каталог и новый заказ */}
+      {showManagerTabs && (
         <Tab.Screen
           name="Products"
           component={ProductsScreen}
@@ -53,7 +54,7 @@ function MainTabs() {
         />
       )}
 
-      {!isCourier && !isPicker && (
+      {showManagerTabs && (
         <Tab.Screen
           name="NewOrder"
           component={NewOrderScreen}

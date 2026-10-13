@@ -22,7 +22,7 @@ import { theme } from '../constants/theme';
 export const DeliveryTodayScreen = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { user } = useAuth();
+  const { user, isDriverMode, setIsDriverMode } = useAuth();
 
   const [activeOrders, setActiveOrders] = useState<Order[]>([]);
   const [formedOrders, setFormedOrders] = useState<Order[]>([]);
@@ -32,11 +32,8 @@ export const DeliveryTodayScreen = () => {
   // Тогглер отображается и работает только для роли 'courier' (позволяет развозчику переключаться между простым видом и диспетчерским)
   // Для диспетчера и сборщика всегда false (полный диспетчерский вид)
   const isCourier = user?.role === 'courier';
-  const [driverMode, setDriverMode] = useState<boolean>(isCourier);
-
-  useEffect(() => {
-    setDriverMode(user?.role === 'courier');
-  }, [user?.role]);
+  const driverMode = isDriverMode;
+  const setDriverMode = setIsDriverMode;
 
   useEffect(() => {
     const unsubscribe = StorageService.subscribeOrders(user?.farmId || '', (all) => {

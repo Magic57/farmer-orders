@@ -13,6 +13,8 @@ interface AuthContextType {
   changeRole: (role: UserRole) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   deleteCurrentAccount: () => Promise<void>;
+  isDriverMode: boolean;
+  setIsDriverMode: (val: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -20,14 +22,17 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [isDriverMode, setIsDriverMode] = useState<boolean>(false);
 
   useEffect(() => {
     const unsubscribe = AuthService.subscribeAuth(async (firebaseUser) => {
       if (firebaseUser) {
         const profile = await AuthService.getUserProfile(firebaseUser.uid);
         setUser(profile);
+        setIsDriverMode(profile?.role === 'courier');
       } else {
         setUser(null);
+        setIsDriverMode(false);
       }
       setLoading(false);
     });
@@ -103,6 +108,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         changeRole,
         resetPassword,
         deleteCurrentAccount,
+        isDriverMode,
+        setIsDriverMode,
       }}
     >
       {children}
