@@ -5,56 +5,86 @@ import { theme } from '../constants/theme';
 
 interface Props {
   item: OrderItem;
-  onUpdateQuantity: (val: number) => void;
+  onUpdateItem: (updated: { piecesCount?: number; actualWeight?: number; quantity: number; totalPrice: number }) => void;
   onRemove: () => void;
+  showWeightInput?: boolean; // Показывать ли поле фактического взвешивания (для работы/доставки)
 }
 
-export const OrderItemCard: React.FC<Props> = ({ item, onUpdateQuantity, onRemove }) => {
-  const isKg = item.unit === 'kg';
-  const unitLabel = isKg ? 'кг' : 'шт';
+export const OrderItemCard: React.FC<Props> = ({
+  item,
+  onUpdateItem,
+  onRemove,
+  showWeightInput = true,
+}) => {
+  const isKgProduct = item.unit === 'kg';
 
-  // Локальный стейт строки, чтобы пользователь мог комфортно вводить запятую/точку и до 3 знаков
-  const [textValue, setTextValue] = useState<string>(
-    item.quantity === 0 ? '' : item.quantity.toString()
+  // Поле штук
+  const [piecesText, setPiecesText] = useState<string>(
+    item.piecesCount !== undefined ? item.piecesCount.toString() : (isKgProduct ? '1' : item.quantity.toString())
+  );
+
+  // Поле фактического веса
+  const [weightText, setWeightText] = useState<string>(
+    item.actualWeight !== undefined && item.actualWeight > 0 ? item.actualWeight.toString() : ''
   );
 
   useEffect(() => {
-    // Синхронизируем, если значение изменилось извне
-    const currentParsed = parseFloat(textValue.replace(',', '.'));
-    if (isNaN(currentParsed) && item.quantity === 0) return;
-    if (currentParsed !== item.quantity) {
-      setTextValue(item.quantity === 0 ? '' : item.quantity.toString());
+    if (item.piecesCount !== undefined) {
+      setPiecesText(item.piecesCount.toString());
     }
-  }, [item.quantity]);
+    if (item.actualWeight !== undefined) {
+      setWeightText(item.actualWeight > 0 ? item.actualWeight.toString() : '');
+    }
+  }, [item.piecesCount, item.actualWeight]);
 
-  const handleTextChange = (text: string) => {
-    // Разрешаем только цифры, одну точку или запятую
-    const normalized = text.replace(',', '.');
-    
-    // Проверка формата: до 3 знаков после запятой для кг, только целые для шт
-    if (isKg) {
-      // Регулярка: цифры с опциональной точкой и до 3 знаков после неё
-      if (normalized !== '' && !/^\d+(\.\d{0,3})?$/.test(normalized)) {
-        return;
-      }
+  const handlePiecesChange = (text: string) => {
+    // Только целые числа для штук
+    const clean = text.replace(/[^0-9]/g, '');
+    setPiecesText(clean);
+
+    const pieces = parseInt(clean, 10) || 0;
+    const currentWeight = parseFloat(weightText.replace(',', '.')) || 0;
+
+    let qty = 0;
+    let total = 0;
+
+    if (isKgProduct) {
+      // Если весовой товар: если фактический вес уже взвешен, считаем по нему, иначе 0 ₽ до взвешивания
+      qty = currentWeight > 0 ? currentWeight : 0;
+      total = parseFloat((qty * item.pricePerUnit).toFixed(2));
     } else {
-      // Для штук только целые положительные числа
-      if (normalized !== '' && !/^\d+$/.test(normalized)) {
-        return;
-      }
+      // Если штучный товар: считаем по штукам
+      qty = pieces;
+      total = parseFloat((pieces * item.pricePerUnit).toFixed(2));
     }
 
-    setTextValue(text);
+    onUpdateItem({
+      piecesCount: pieces,
+      actualWeight: currentWeight,
+      quantity: qty,
+      totalPrice: total,
+    });
+  };
 
-    if (text === '' || text === '.') {
-      onUpdateQuantity(0);
+  const handleWeightChange = (text: string) => {
+    const normalized = text.replace(',', '.');
+    // До 3 знаков после запятой
+    if (normalized !== '' && !/^\d+(\.\d{0,3})?$/.test(normalized)) {
       return;
     }
+    setWeightText(text);
 
-    const parsed = parseFloat(normalized);
-    if (!isNaN(parsed) && parsed >= 0) {
-      onUpdateQuantity(parsed);
-    }
+    const pieces = parseInt(piecesText, 10) || 0;
+    const weight = parseFloat(normalized) || 0;
+
+    const total = parseFloat((weight * item.pricePerUnit).toFixed(2));
+
+    onUpdateItem({
+      piecesCount: pieces,
+      actualWeight: weight,
+      quantity: weight,
+      totalPrice: total,
+    });
   };
 
   return (
@@ -67,24 +97,45 @@ export const OrderItemCard: React.FC<Props> = ({ item, onUpdateQuantity, onRemov
       </View>
 
       <Text style={styles.rate}>
-        Цена: {item.pricePerUnit} ₽ за {unitLabel}
+        Цена: {item.pricePerUnit} ₽ за {item.unit === 'kg' ? 'кг' : 'шт'}
       </Text>
 
       <View style={styles.controlsRow}>
+        {/* Поле количества штук (доступно всегда: и для штучных, и для весовых тушек) */}
         <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>{isKg ? 'Вес (кг):' : 'Кол-во (шт):'}</Text>
+          <Text style={styles.inputLabel}>
+            {isKgProduct ? 'Кол-во (шт):' : 'Кол-во:'}
+          </Text>
           <TextInput
-            style={[styles.input, isKg && styles.inputKg]}
-            keyboardType="decimal-pad"
-            value={textValue}
-            onChangeText={handleTextChange}
-            placeholder={isKg ? '0.000' : '0'}
+            style={styles.input}
+            keyboardType="number-pad"
+            value={piecesText}
+            onChangeText={handlePiecesChange}
+            placeholder="0"
           />
         </View>
 
+        {/* Для весовых товаров: ввод фактического веса */}
+        {isKgProduct && showWeightInput && (
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Вес (кг):</Text>
+            <TextInput
+              style={[styles.input, styles.inputKg]}
+              keyboardType="decimal-pad"
+              value={weightText}
+              onChangeText={handleWeightChange}
+              placeholder="0.000"
+            />
+          </View>
+        )}
+
         <View style={styles.totalBlock}>
           <Text style={styles.totalLabel}>Итого:</Text>
-          <Text style={styles.totalValue}>{item.totalPrice.toFixed(2)} ₽</Text>
+          <Text style={styles.totalValue}>
+            {isKgProduct && (!item.actualWeight || item.actualWeight === 0)
+              ? 'до взвеш.'
+              : `${item.totalPrice.toFixed(2)} ₽`}
+          </Text>
         </View>
       </View>
     </View>
@@ -127,39 +178,43 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginRight: 6,
+    marginVertical: 4,
   },
   inputLabel: {
-    fontSize: 14,
+    fontSize: 13,
     color: theme.colors.textMain,
-    marginRight: 8,
+    marginRight: 6,
   },
   input: {
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.sm,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 4,
-    width: 75,
+    width: 60,
     textAlign: 'center',
-    fontSize: 15,
+    fontSize: 14,
     backgroundColor: '#FAF8F5',
   },
   inputKg: {
-    width: 95, // Расширенное поле для ввода трех знаков после запятой (например 4,155)
+    width: 85,
   },
   totalBlock: {
     alignItems: 'flex-end',
+    marginVertical: 4,
   },
   totalLabel: {
     fontSize: 11,
     color: theme.colors.textMuted,
   },
   totalValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: theme.colors.primary,
   },

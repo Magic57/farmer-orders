@@ -15,6 +15,7 @@ import { StorageService } from '../services/storage';
 import { OrderItemCard } from '../components/OrderItemCard';
 import { SelectProductModal } from '../components/SelectProductModal';
 import { SelectCustomerModal } from '../components/SelectCustomerModal';
+import { DatePickerModal } from '../components/DatePickerModal';
 import { theme } from '../constants/theme';
 
 export const NewOrderScreen = () => {
@@ -23,11 +24,13 @@ export const NewOrderScreen = () => {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryDate, setDeliveryDate] = useState('');
   const [items, setItems] = useState<OrderItem[]>([]);
   const [catalog, setCatalog] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [productModalVisible, setProductModalVisible] = useState(false);
   const [customerModalVisible, setCustomerModalVisible] = useState(false);
+  const [dateModalVisible, setDateModalVisible] = useState(false);
 
   useEffect(() => {
     loadCatalog();
@@ -53,7 +56,6 @@ export const NewOrderScreen = () => {
   const handleSaveCustomer = async (updated: Customer) => {
     await StorageService.saveCustomer(updated);
     loadCustomers();
-    // Если редактировали выбранного сейчас клиента, обновим и в полях
     if (customerName === updated.name) {
       setCustomerPhone(updated.phone);
       setDeliveryAddress(updated.address);
@@ -81,26 +83,28 @@ export const NewOrderScreen = () => {
       return;
     }
 
+    const isKg = product.unit === 'kg';
     const newItem: OrderItem = {
       id: Date.now().toString(),
       productId: product.id,
       productName: product.name,
       unit: product.unit,
       pricePerUnit: product.pricePerUnit,
-      quantity: 1,
-      totalPrice: product.pricePerUnit * 1,
+      piecesCount: 1, // по умолчанию 1 штука
+      actualWeight: 0, // вес добавится позже при взвешивании
+      quantity: isKg ? 0 : 1, // если кг - расчет веса до взвешивания = 0
+      totalPrice: isKg ? 0 : product.pricePerUnit,
     };
     setItems((prev) => [...prev, newItem]);
   };
 
-  const handleUpdateQuantity = (id: string, qty: number) => {
+  const handleUpdateItem = (id: string, updated: { piecesCount?: number; actualWeight?: number; quantity: number; totalPrice: number }) => {
     setItems((prev) =>
       prev.map((item) => {
         if (item.id === id) {
           return {
             ...item,
-            quantity: qty,
-            totalPrice: parseFloat((qty * item.pricePerUnit).toFixed(2)),
+            ...updated,
           };
         }
         return item;
@@ -139,6 +143,7 @@ export const NewOrderScreen = () => {
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
       deliveryAddress: deliveryAddress.trim(),
+      deliveryDate: deliveryDate || undefined,
       items,
       totalAmount: parseFloat(totalOrderAmount.toFixed(2)),
       status: 'formed',
@@ -146,17 +151,24 @@ export const NewOrderScreen = () => {
     };
 
     await StorageService.saveOrder(newOrder);
-    Alert.alert('Успешно', 'Заказ сохранен!', [
+    Alert.alert('Успешно', 'Заказ сформирован!', [
       {
         text: 'OK',
         onPress: () => {
           setCustomerName('');
           setCustomerPhone('');
           setDeliveryAddress('');
+          setDeliveryDate('');
           setItems([]);
         },
       },
     ]);
+  };
+
+  const formatDisplayDate = (d: string) => {
+    if (!d) return 'Выберите дату доставки 📅';
+    const [year, month, day] = d.split('-');
+    return `📅 Дата доставки: ${day}.${month}.${year}`;
   };
 
   return (
@@ -197,6 +209,16 @@ export const NewOrderScreen = () => {
         onChangeText={setDeliveryAddress}
       />
 
+      {/* Поле даты доставки */}
+      <TouchableOpacity
+        style={styles.datePickerBtn}
+        onPress={() => setDateModalVisible(true)}
+      >
+        <Text style={[styles.datePickerText, !!deliveryDate && styles.datePickerTextActive]}>
+          {formatDisplayDate(deliveryDate)}
+        </Text>
+      </TouchableOpacity>
+
       <View style={styles.itemsHeader}>
         <Text style={styles.sectionTitle}>Товары в заказе ({items.length})</Text>
         <TouchableOpacity
@@ -216,19 +238,20 @@ export const NewOrderScreen = () => {
           <OrderItemCard
             key={item.id}
             item={item}
-            onUpdateQuantity={(qty) => handleUpdateQuantity(item.id, qty)}
+            showWeightInput={false} // На этапе нового заказа указываем штуки, вес - при взятии в работу
+            onUpdateItem={(upd) => handleUpdateItem(item.id, upd)}
             onRemove={() => handleRemoveItem(item.id)}
           />
         ))
       )}
 
       <View style={styles.totalContainer}>
-        <Text style={styles.totalText}>Итого к оплате:</Text>
+        <Text style={styles.totalText}>Предварительная сумма:</Text>
         <Text style={styles.totalValue}>{totalOrderAmount.toFixed(2)} ₽</Text>
       </View>
 
       <TouchableOpacity style={styles.submitBtn} onPress={handleSaveOrder}>
-        <Text style={styles.submitBtnText}>Сохранить заказ</Text>
+        <Text style={styles.submitBtnText}>Сформировать заказ</Text>
       </TouchableOpacity>
 
       <SelectProductModal
@@ -245,6 +268,13 @@ export const NewOrderScreen = () => {
         onSaveCustomer={handleSaveCustomer}
         onDeleteCustomer={handleDeleteCustomer}
         onClose={() => setCustomerModalVisible(false)}
+      />
+
+      <DatePickerModal
+        visible={dateModalVisible}
+        selectedDate={deliveryDate}
+        onSelectDate={setDeliveryDate}
+        onClose={() => setDateModalVisible(false)}
       />
     </ScrollView>
   );
@@ -293,6 +323,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginBottom: 8,
   },
+  datePickerBtn: {
+    backgroundColor: theme.colors.cardBg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    padding: 12,
+    marginBottom: 8,
+  },
+  datePickerText: {
+    fontSize: 15,
+    color: theme.colors.textMuted,
+  },
+  datePickerTextActive: {
+    color: theme.colors.primary,
+    fontWeight: '600',
+  },
   itemsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -334,12 +380,12 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
   },
   totalText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: theme.colors.textMain,
   },
   totalValue: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
     color: theme.colors.primary,
   },

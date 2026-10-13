@@ -111,6 +111,12 @@ export const OrderHistoryScreen = () => {
 
                 <Text style={styles.date}>Создан: {formatDate(item.createdAt)}</Text>
 
+                {item.deliveryDate ? (
+                  <Text style={styles.deliveryDateText}>
+                    📅 Доставка: {item.deliveryDate.split('-').reverse().join('.')}
+                  </Text>
+                ) : null}
+
                 {item.deliveryAddress ? (
                   <Text style={styles.address} numberOfLines={1}>
                     📍 {item.deliveryAddress}
@@ -204,6 +210,12 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 12,
     color: theme.colors.textMuted,
+    marginBottom: 4,
+  },
+  deliveryDateText: {
+    fontSize: 13,
+    color: theme.colors.primary,
+    fontWeight: '600',
     marginBottom: 4,
   },
   address: {

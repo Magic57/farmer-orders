@@ -126,13 +126,26 @@ export const DeliveryTodayScreen = () => {
                   <Text style={styles.phone}>📞 {item.customerPhone}</Text>
                 ) : null}
 
+                {item.deliveryDate ? (
+                  <Text style={styles.deliveryDateText}>
+                    📅 Доставка: {item.deliveryDate.split('-').reverse().join('.')}
+                  </Text>
+                ) : null}
+
                 {item.deliveryAddress ? (
                   <Text style={styles.address}>📍 {item.deliveryAddress}</Text>
                 ) : null}
 
                 <View style={styles.itemsSummary}>
                   <Text style={styles.itemsListText} numberOfLines={2}>
-                    {item.items.map((i) => `${i.productName} (${i.quantity} ${i.unit === 'kg' ? 'кг' : 'шт'})`).join(', ')}
+                    {item.items.map((i) => {
+                      if (i.unit === 'kg') {
+                        const pieces = i.piecesCount ? `${i.piecesCount} шт` : '';
+                        const weight = i.actualWeight && i.actualWeight > 0 ? `${i.actualWeight} кг` : 'вес не указан';
+                        return `${i.productName} (${pieces ? pieces + ', ' : ''}${weight})`;
+                      }
+                      return `${i.productName} (${i.quantity} шт)`;
+                    }).join(', ')}
                   </Text>
                 </View>
 
@@ -285,6 +298,12 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 4,
     overflow: 'hidden',
+  },
+  deliveryDateText: {
+    fontSize: 13,
+    color: theme.colors.primary,
+    fontWeight: '600',
+    marginBottom: 4,
   },
   phone: {
     fontSize: 14,

@@ -15,9 +15,11 @@ export interface OrderItem {
   id: string;
   productId: string;
   productName: string;
-  unit: UnitType;
+  unit: UnitType; // исходная единица товара в каталоге
   pricePerUnit: number;
-  quantity: number;
+  piecesCount?: number; // количество штук (например: 2 кролика / 3 курицы)
+  actualWeight?: number; // фактический вес в кг при взвешивании (например: 4.155 кг)
+  quantity: number; // итоговое число для расчета цены (штуки или фактический вес)
   totalPrice: number;
 }
 
@@ -26,6 +28,7 @@ export interface Order {
   customerName: string;
   customerPhone: string;
   deliveryAddress: string;
+  deliveryDate?: string; // Дата доставки (формат YYYY-MM-DD или DD.MM.YYYY)
   items: OrderItem[];
   totalAmount: number;
   status: OrderStatus;

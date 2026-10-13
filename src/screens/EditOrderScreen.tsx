@@ -14,6 +14,7 @@ import { StorageService } from '../services/storage';
 import { OrderItemCard } from '../components/OrderItemCard';
 import { SelectProductModal } from '../components/SelectProductModal';
 import { SelectCustomerModal } from '../components/SelectCustomerModal';
+import { DatePickerModal } from '../components/DatePickerModal';
 import { theme } from '../constants/theme';
 
 export const EditOrderScreen = () => {
@@ -25,11 +26,13 @@ export const EditOrderScreen = () => {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryDate, setDeliveryDate] = useState('');
   const [items, setItems] = useState<OrderItem[]>([]);
   const [catalog, setCatalog] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [productModalVisible, setProductModalVisible] = useState(false);
   const [customerModalVisible, setCustomerModalVisible] = useState(false);
+  const [dateModalVisible, setDateModalVisible] = useState(false);
 
   useEffect(() => {
     loadOrder();
@@ -45,6 +48,7 @@ export const EditOrderScreen = () => {
       setCustomerName(data.customerName);
       setCustomerPhone(data.customerPhone);
       setDeliveryAddress(data.deliveryAddress);
+      setDeliveryDate(data.deliveryDate || '');
       setItems(data.items);
     }
   };
@@ -95,26 +99,28 @@ export const EditOrderScreen = () => {
       return;
     }
 
+    const isKg = product.unit === 'kg';
     const newItem: OrderItem = {
       id: Date.now().toString(),
       productId: product.id,
       productName: product.name,
       unit: product.unit,
       pricePerUnit: product.pricePerUnit,
-      quantity: 1,
-      totalPrice: product.pricePerUnit * 1,
+      piecesCount: 1,
+      actualWeight: 0,
+      quantity: isKg ? 0 : 1,
+      totalPrice: isKg ? 0 : product.pricePerUnit,
     };
     setItems((prev) => [...prev, newItem]);
   };
 
-  const handleUpdateQuantity = (id: string, qty: number) => {
+  const handleUpdateItem = (id: string, updated: { piecesCount?: number; actualWeight?: number; quantity: number; totalPrice: number }) => {
     setItems((prev) =>
       prev.map((item) => {
         if (item.id === id) {
           return {
             ...item,
-            quantity: qty,
-            totalPrice: parseFloat((qty * item.pricePerUnit).toFixed(2)),
+            ...updated,
           };
         }
         return item;
@@ -153,6 +159,7 @@ export const EditOrderScreen = () => {
       customerName: customerName.trim(),
       customerPhone: customerPhone.trim(),
       deliveryAddress: deliveryAddress.trim(),
+      deliveryDate: deliveryDate || undefined,
       items,
       totalAmount: parseFloat(totalOrderAmount.toFixed(2)),
       status: order?.status || 'formed',
@@ -177,6 +184,12 @@ export const EditOrderScreen = () => {
         },
       },
     ]);
+  };
+
+  const formatDisplayDate = (d: string) => {
+    if (!d) return 'Выберите дату доставки 📅';
+    const [year, month, day] = d.split('-');
+    return `📅 Дата доставки: ${day}.${month}.${year}`;
   };
 
   if (!order) {
@@ -260,8 +273,17 @@ export const EditOrderScreen = () => {
         onChangeText={setDeliveryAddress}
       />
 
+      <TouchableOpacity
+        style={styles.datePickerBtn}
+        onPress={() => setDateModalVisible(true)}
+      >
+        <Text style={[styles.datePickerText, !!deliveryDate && styles.datePickerTextActive]}>
+          {formatDisplayDate(deliveryDate)}
+        </Text>
+      </TouchableOpacity>
+
       <View style={styles.itemsHeader}>
-        <Text style={styles.sectionTitle}>Позиции в корзине</Text>
+        <Text style={styles.sectionTitle}>Позиции в заказе ({items.length})</Text>
         <TouchableOpacity
           style={styles.addBtn}
           onPress={() => setProductModalVisible(true)}
@@ -274,7 +296,8 @@ export const EditOrderScreen = () => {
         <OrderItemCard
           key={item.id}
           item={item}
-          onUpdateQuantity={(qty) => handleUpdateQuantity(item.id, qty)}
+          showWeightInput={true} // При редактировании и работе доступен ввод точного веса
+          onUpdateItem={(upd) => handleUpdateItem(item.id, upd)}
           onRemove={() => handleRemoveItem(item.id)}
         />
       ))}
@@ -306,6 +329,13 @@ export const EditOrderScreen = () => {
         onSaveCustomer={handleSaveCustomer}
         onDeleteCustomer={handleDeleteCustomer}
         onClose={() => setCustomerModalVisible(false)}
+      />
+
+      <DatePickerModal
+        visible={dateModalVisible}
+        selectedDate={deliveryDate}
+        onSelectDate={setDeliveryDate}
+        onClose={() => setDateModalVisible(false)}
       />
     </ScrollView>
   );
@@ -357,6 +387,22 @@ const styles = StyleSheet.create({
     padding: 10,
     fontSize: 15,
     marginBottom: 8,
+  },
+  datePickerBtn: {
+    backgroundColor: theme.colors.cardBg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    padding: 12,
+    marginBottom: 8,
+  },
+  datePickerText: {
+    fontSize: 15,
+    color: theme.colors.textMuted,
+  },
+  datePickerTextActive: {
+    color: theme.colors.primary,
+    fontWeight: '600',
   },
   itemsHeader: {
     flexDirection: 'row',
