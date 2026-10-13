@@ -150,34 +150,39 @@ export const EditOrderScreen = () => {
       return;
     }
 
-    // Сохраняем/обновляем в постоянных клиентах
-    const customerToSave: Customer = {
-      id: Date.now().toString(),
-      name: customerName.trim(),
-      phone: customerPhone.trim(),
-      address: deliveryAddress.trim(),
-      farmId: user?.farmId || '',
-      createdAt: Date.now(),
-    };
-    await StorageService.saveCustomer(customerToSave, user?.farmId);
+    try {
+      // Сохраняем/обновляем в постоянных клиентах
+      const customerToSave: Customer = {
+        id: Date.now().toString(),
+        name: customerName.trim(),
+        phone: customerPhone.trim(),
+        address: deliveryAddress.trim(),
+        farmId: user?.farmId || '',
+        createdAt: Date.now(),
+      };
+      await StorageService.saveCustomer(customerToSave, user?.farmId);
 
-    const updatedOrder: Order = {
-      id: orderId,
-      customerName: customerName.trim(),
-      customerPhone: customerPhone.trim(),
-      deliveryAddress: deliveryAddress.trim(),
-      deliveryDate: deliveryDate || undefined,
-      items,
-      totalAmount: parseFloat(totalOrderAmount.toFixed(2)),
-      status: order?.status || 'formed',
-      farmId: user?.farmId || '',
-      createdAt: order?.createdAt || Date.now(),
-    };
+      const updatedOrder: Order = {
+        id: orderId,
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        deliveryAddress: deliveryAddress.trim(),
+        deliveryDate: deliveryDate || undefined,
+        items,
+        totalAmount: parseFloat(totalOrderAmount.toFixed(2)),
+        status: order?.status || 'formed',
+        farmId: user?.farmId || '',
+        createdAt: order?.createdAt || Date.now(),
+      };
 
-    await StorageService.saveOrder(updatedOrder, user?.farmId);
-    Alert.alert('Готово', 'Изменения в заказе сохранены!', [
-      { text: 'OK', onPress: () => navigation.goBack() },
-    ]);
+      await StorageService.saveOrder(updatedOrder, user?.farmId);
+      Alert.alert('Готово', 'Изменения в заказе сохранены!', [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
+    } catch (e: any) {
+      console.error('Ошибка сохранения заказа:', e);
+      Alert.alert('Ошибка сохранения', e.message || 'Не удалось сохранить заказ.');
+    }
   };
 
   const handleDeleteOrder = () => {

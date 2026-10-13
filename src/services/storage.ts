@@ -223,17 +223,22 @@ export const StorageService = {
         id: order.id,
         customerName: order.customerName,
         customerPhone: order.customerPhone || '',
-        items: order.items.map((i) => ({
-          productId: i.productId,
-          productName: i.productName,
-          unit: i.unit,
-          pricePerUnit: i.pricePerUnit,
-          quantity: i.quantity,
-          amount: i.amount,
-          ...(i.piecesCount !== undefined ? { piecesCount: i.piecesCount } : {}),
-          ...(i.actualWeight !== undefined ? { actualWeight: i.actualWeight } : {}),
-        })),
-        totalAmount: order.totalAmount,
+        items: order.items.map((i: any) => {
+          const itemAmount = i.totalPrice !== undefined ? i.totalPrice : (i.amount !== undefined ? i.amount : 0);
+          const itemClean: any = {
+            id: i.id || Date.now().toString(),
+            productId: i.productId || '',
+            productName: i.productName || '',
+            unit: i.unit || 'piece',
+            pricePerUnit: i.pricePerUnit || 0,
+            quantity: i.quantity !== undefined ? i.quantity : 0,
+            totalPrice: itemAmount,
+          };
+          if (i.piecesCount !== undefined && i.piecesCount !== null) itemClean.piecesCount = i.piecesCount;
+          if (i.actualWeight !== undefined && i.actualWeight !== null) itemClean.actualWeight = i.actualWeight;
+          return itemClean;
+        }),
+        totalAmount: order.totalAmount || 0,
         status: order.status || 'formed',
         farmId: targetFarmId,
         createdAt: order.createdAt || Date.now(),

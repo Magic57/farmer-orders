@@ -123,43 +123,48 @@ export const NewOrderScreen = () => {
       return;
     }
 
-    // Сохраняем заказчика в базу постоянных клиентов
-    const customerToSave: Customer = {
-      id: Date.now().toString(),
-      name: customerName.trim(),
-      phone: customerPhone.trim(),
-      address: deliveryAddress.trim(),
-      farmId: user?.farmId || '',
-      createdAt: Date.now(),
-    };
-    await StorageService.saveCustomer(customerToSave, user?.farmId);
+    try {
+      // Сохраняем заказчика в базу постоянных клиентов
+      const customerToSave: Customer = {
+        id: Date.now().toString(),
+        name: customerName.trim(),
+        phone: customerPhone.trim(),
+        address: deliveryAddress.trim(),
+        farmId: user?.farmId || '',
+        createdAt: Date.now(),
+      };
+      await StorageService.saveCustomer(customerToSave, user?.farmId);
 
-    const newOrder: Order = {
-      id: Date.now().toString(),
-      customerName: customerName.trim(),
-      customerPhone: customerPhone.trim(),
-      deliveryAddress: deliveryAddress.trim(),
-      deliveryDate: deliveryDate || undefined,
-      items,
-      totalAmount: parseFloat(totalOrderAmount.toFixed(2)),
-      status: 'formed',
-      farmId: user?.farmId || '',
-      createdAt: Date.now(),
-    };
+      const newOrder: Order = {
+        id: Date.now().toString(),
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        deliveryAddress: deliveryAddress.trim(),
+        deliveryDate: deliveryDate || undefined,
+        items,
+        totalAmount: parseFloat(totalOrderAmount.toFixed(2)),
+        status: 'formed',
+        farmId: user?.farmId || '',
+        createdAt: Date.now(),
+      };
 
-    await StorageService.saveOrder(newOrder, user?.farmId);
-    Alert.alert('Успешно', 'Заказ сформирован!', [
-      {
-        text: 'OK',
-        onPress: () => {
-          setCustomerName('');
-          setCustomerPhone('');
-          setDeliveryAddress('');
-          setDeliveryDate('');
-          setItems([]);
+      await StorageService.saveOrder(newOrder, user?.farmId);
+      Alert.alert('Успешно 🎉', 'Заказ успешно сформирован!', [
+        {
+          text: 'OK',
+          onPress: () => {
+            setCustomerName('');
+            setCustomerPhone('');
+            setDeliveryAddress('');
+            setDeliveryDate('');
+            setItems([]);
+          },
         },
-      },
-    ]);
+      ]);
+    } catch (e: any) {
+      console.error('Ошибка создания заказа:', e);
+      Alert.alert('Ошибка формирования заказа', e.message || 'Не удалось сохранить заказ.');
+    }
   };
 
   const formatDisplayDate = (d: string) => {
