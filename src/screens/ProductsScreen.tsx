@@ -64,7 +64,7 @@ export const ProductsScreen = () => {
           )}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 
