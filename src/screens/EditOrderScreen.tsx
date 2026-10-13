@@ -187,6 +187,8 @@ export const EditOrderScreen = () => {
     );
   }
 
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.statusSection}>
         <Text style={styles.statusLabel}>Статус заказа:</Text>
         <View style={styles.statusRow}>
