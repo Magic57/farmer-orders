@@ -27,6 +27,7 @@ export const NewOrderScreen = () => {
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [catalog, setCatalog] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -44,6 +45,7 @@ export const NewOrderScreen = () => {
   }, [user?.farmId]);
 
   const handleSelectCustomer = (customer: Customer) => {
+    setSelectedCustomerId(customer.id);
     setCustomerName(customer.name);
     setCustomerPhone(customer.phone);
     setDeliveryAddress(customer.address);
@@ -124,14 +126,23 @@ export const NewOrderScreen = () => {
     }
 
     try {
-      // Сохраняем заказчика в базу постоянных клиентов
+      // Ищем, есть ли уже такой заказчик в списке (по ID или по имени/телефону)
+      const existingCustomer =
+        customers.find((c) => c.id === selectedCustomerId) ||
+        customers.find(
+          (c) =>
+            (c.name.trim().toLowerCase() === customerName.trim().toLowerCase()) ||
+            (customerPhone.trim() && c.phone && c.phone.trim() === customerPhone.trim())
+        );
+
+      // Сохраняем/обновляем заказчика в базе постоянных клиентов без дублирования
       const customerToSave: Customer = {
-        id: Date.now().toString(),
+        id: existingCustomer ? existingCustomer.id : Date.now().toString(),
         name: customerName.trim(),
         phone: customerPhone.trim(),
         address: deliveryAddress.trim(),
         farmId: user?.farmId || '',
-        createdAt: Date.now(),
+        createdAt: existingCustomer?.createdAt || Date.now(),
       };
       await StorageService.saveCustomer(customerToSave, user?.farmId);
 
@@ -153,6 +164,7 @@ export const NewOrderScreen = () => {
         {
           text: 'OK',
           onPress: () => {
+            setSelectedCustomerId(null);
             setCustomerName('');
             setCustomerPhone('');
             setDeliveryAddress('');

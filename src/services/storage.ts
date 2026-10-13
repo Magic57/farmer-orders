@@ -290,29 +290,40 @@ export const StorageService = {
   async saveCustomer(customer: Customer, farmId?: string): Promise<void> {
     try {
       const targetFarmId = farmId || customer.farmId || '';
-      const custToSave: any = {
-        id: customer.id,
-        name: customer.name,
-        phone: customer.phone || '',
+      const normName = customer.name.trim().toLowerCase();
+      const normPhone = (customer.phone || '').trim();
+
+      // Ищем существующего постоянного клиента по id или по имени/телефону
+      const existingCustomers = await this.getCustomers();
+      const found = existingCustomers.find(
+        (c) =>
+          c.id === customer.id ||
+          (normName && c.name.trim().toLowerCase() === normName) ||
+          (normPhone && c.phone && c.phone.trim() === normPhone)
+      );
+
+      const targetId = found ? found.id : customer.id;
+
+      const custToSave: Customer = {
+        id: targetId,
+        name: customer.name.trim(),
+        phone: (customer.phone || '').trim(),
+        address: (customer.address || (customer as any).defaultAddress || '').trim(),
         farmId: targetFarmId,
-        createdAt: customer.createdAt || Date.now(),
+        createdAt: found?.createdAt || customer.createdAt || Date.now(),
       };
-      if (customer.defaultAddress) custToSave.defaultAddress = customer.defaultAddress;
 
       if (targetFarmId) {
-        await setDoc(doc(db, 'customers', customer.id), custToSave);
+        await setDoc(doc(db, 'customers', targetId), custToSave);
       }
 
-      const customers = await this.getCustomers();
-      const index = customers.findIndex(
-        (c) => c.id === customer.id || (c.name.toLowerCase() === customer.name.toLowerCase() && c.phone === customer.phone)
-      );
+      const index = existingCustomers.findIndex((c) => c.id === targetId);
       if (index >= 0) {
-        customers[index] = { ...customers[index], ...custToSave };
+        existingCustomers[index] = custToSave;
       } else {
-        customers.unshift(custToSave);
+        existingCustomers.unshift(custToSave);
       }
-      await AsyncStorage.setItem(CUSTOMERS_KEY, JSON.stringify(customers));
+      await AsyncStorage.setItem(CUSTOMERS_KEY, JSON.stringify(existingCustomers));
     } catch (e) {
       console.error('Ошибка сохранения заказчика:', e);
     }

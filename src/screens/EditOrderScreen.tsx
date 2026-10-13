@@ -29,6 +29,7 @@ export const EditOrderScreen = () => {
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [catalog, setCatalog] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -70,13 +71,14 @@ export const EditOrderScreen = () => {
   };
 
   const handleSelectCustomer = (customer: Customer) => {
+    setSelectedCustomerId(customer.id);
     setCustomerName(customer.name);
     setCustomerPhone(customer.phone);
     setDeliveryAddress(customer.address);
   };
 
   const handleSaveCustomer = async (updated: Customer) => {
-    await StorageService.saveCustomer(updated);
+    await StorageService.saveCustomer(updated, user?.farmId);
     loadCustomers();
     if (customerName === updated.name) {
       setCustomerPhone(updated.phone);
@@ -151,14 +153,23 @@ export const EditOrderScreen = () => {
     }
 
     try {
-      // Сохраняем/обновляем в постоянных клиентах
+      // Ищем, есть ли уже такой заказчик в постоянных клиентах
+      const existingCustomer =
+        customers.find((c) => c.id === selectedCustomerId) ||
+        customers.find(
+          (c) =>
+            (c.name.trim().toLowerCase() === customerName.trim().toLowerCase()) ||
+            (customerPhone.trim() && c.phone && c.phone.trim() === customerPhone.trim())
+        );
+
+      // Сохраняем/обновляем в постоянных клиентах без дублирования
       const customerToSave: Customer = {
-        id: Date.now().toString(),
+        id: existingCustomer ? existingCustomer.id : Date.now().toString(),
         name: customerName.trim(),
         phone: customerPhone.trim(),
         address: deliveryAddress.trim(),
         farmId: user?.farmId || '',
-        createdAt: Date.now(),
+        createdAt: existingCustomer?.createdAt || Date.now(),
       };
       await StorageService.saveCustomer(customerToSave, user?.farmId);
 
