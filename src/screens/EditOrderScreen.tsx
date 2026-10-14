@@ -20,6 +20,7 @@ import { theme } from '../constants/theme';
 
 export const EditOrderScreen = () => {
   const { user } = useAuth();
+  const isPicker = user?.role === 'picker';
   const route = useRoute<any>();
   const navigation = useNavigation();
   const orderId = route.params?.orderId;
@@ -145,7 +146,7 @@ export const EditOrderScreen = () => {
   const totalOrderAmount = items.reduce((sum, item) => sum + item.totalPrice, 0);
 
   const handleSaveChanges = async () => {
-    if (!customerName.trim()) {
+    if (!isPicker && !customerName.trim()) {
       Alert.alert('Ошибка', 'Введите имя заказчика');
       return;
     }
@@ -155,33 +156,35 @@ export const EditOrderScreen = () => {
     }
 
     try {
-      // Ищем, есть ли уже такой заказчик в постоянных клиентах
-      const existingCustomer =
-        customers.find((c) => c.id === selectedCustomerId) ||
-        customers.find(
-          (c) =>
-            (c.name.trim().toLowerCase() === customerName.trim().toLowerCase()) ||
-            (customerPhone.trim() && c.phone && c.phone.trim() === customerPhone.trim())
-        );
+      if (!isPicker) {
+        // Ищем, есть ли уже такой заказчик в постоянных клиентах
+        const existingCustomer =
+          customers.find((c) => c.id === selectedCustomerId) ||
+          customers.find(
+            (c) =>
+              (c.name.trim().toLowerCase() === customerName.trim().toLowerCase()) ||
+              (customerPhone.trim() && c.phone && c.phone.trim() === customerPhone.trim())
+          );
 
-      // Сохраняем/обновляем в постоянных клиентах без дублирования
-      const customerToSave: Customer = {
-        id: existingCustomer ? existingCustomer.id : Date.now().toString(),
-        name: customerName.trim(),
-        phone: customerPhone.trim(),
-        address: deliveryAddress.trim(),
-        farmId: user?.farmId || '',
-        createdAt: existingCustomer?.createdAt || Date.now(),
-      };
-      await StorageService.saveCustomer(customerToSave, user?.farmId);
+        // Сохраняем/обновляем в постоянных клиентах без дублирования
+        const customerToSave: Customer = {
+          id: existingCustomer ? existingCustomer.id : Date.now().toString(),
+          name: customerName.trim(),
+          phone: customerPhone.trim(),
+          address: deliveryAddress.trim(),
+          farmId: user?.farmId || '',
+          createdAt: existingCustomer?.createdAt || Date.now(),
+        };
+        await StorageService.saveCustomer(customerToSave, user?.farmId);
+      }
 
       const updatedOrder: Order = {
         id: orderId,
-        customerName: customerName.trim(),
-        customerPhone: customerPhone.trim(),
-        deliveryAddress: deliveryAddress.trim(),
-        deliveryDate: deliveryDate || undefined,
-        comment: comment.trim() || undefined,
+        customerName: isPicker ? (order?.customerName || customerName) : customerName.trim(),
+        customerPhone: isPicker ? (order?.customerPhone || customerPhone) : customerPhone.trim(),
+        deliveryAddress: isPicker ? (order?.deliveryAddress || deliveryAddress) : deliveryAddress.trim(),
+        deliveryDate: isPicker ? order?.deliveryDate : (deliveryDate || undefined),
+        comment: isPicker ? order?.comment : (comment.trim() || undefined),
         items,
         totalAmount: parseFloat(totalOrderAmount.toFixed(2)),
         status: order?.status || 'formed',
@@ -245,16 +248,42 @@ export const EditOrderScreen = () => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.statusBtn, order?.status === 'in_progress' && styles.statusBtnActiveProgress]}
+            style={[styles.statusBtn, order?.status === 'assembling' && styles.statusBtnActiveAssembling]}
             onPress={async () => {
-              await StorageService.updateOrderStatus(orderId, 'in_progress');
-              setOrder((prev) => prev ? { ...prev, status: 'in_progress' } : null);
+              await StorageService.updateOrderStatus(orderId, 'assembling');
+              setOrder((prev) => prev ? { ...prev, status: 'assembling' } : null);
             }}
           >
-            <Text style={[styles.statusBtnText, order?.status === 'in_progress' && styles.statusBtnTextActive]}>
-              В работе
+            <Text style={[styles.statusBtnText, order?.status === 'assembling' && styles.statusBtnTextActive]}>
+              В сборке
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.statusBtn, order?.status === 'assembled' && styles.statusBtnActiveAssembled]}
+            onPress={async () => {
+              await StorageService.updateOrderStatus(orderId, 'assembled');
+              setOrder((prev) => prev ? { ...prev, status: 'assembled' } : null);
+            }}
+          >
+            <Text style={[styles.statusBtnText, order?.status === 'assembled' && styles.statusBtnTextActive]}>
+              Собран
+            </Text>
+          </TouchableOpacity>
+
+          {order?.status === 'in_progress' && (
+            <TouchableOpacity
+              style={[styles.statusBtn, styles.statusBtnActiveProgress]}
+              onPress={async () => {
+                await StorageService.updateOrderStatus(orderId, 'in_progress');
+                setOrder((prev) => prev ? { ...prev, status: 'in_progress' } : null);
+              }}
+            >
+              <Text style={[styles.statusBtnText, styles.statusBtnTextActive]}>
+                В работе
+              </Text>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={[styles.statusBtn, order?.status === 'completed' && styles.statusBtnActiveCompleted]}
@@ -272,51 +301,88 @@ export const EditOrderScreen = () => {
 
       <View style={styles.customerHeader}>
         <Text style={styles.sectionTitle}>Контакты заказчика</Text>
-        <TouchableOpacity
-          style={styles.chooseCustomerBtn}
-          onPress={() => setCustomerModalVisible(true)}
-        >
-          <Text style={styles.chooseCustomerBtnText}>👥 Выбрать из списка</Text>
-        </TouchableOpacity>
+        {!isPicker && (
+          <TouchableOpacity
+            style={styles.chooseCustomerBtn}
+            onPress={() => setCustomerModalVisible(true)}
+          >
+            <Text style={styles.chooseCustomerBtnText}>👥 Выбрать из списка</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Имя заказчика *"
-        value={customerName}
-        onChangeText={setCustomerName}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Номер телефона"
-        keyboardType="phone-pad"
-        value={customerPhone}
-        onChangeText={setCustomerPhone}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Адрес доставки"
-        value={deliveryAddress}
-        onChangeText={setDeliveryAddress}
-      />
+      {isPicker ? (
+        <View style={styles.readOnlyCustomerCard}>
+          <View style={styles.readOnlyRow}>
+            <Text style={styles.readOnlyLabel}>👤 Заказчик:</Text>
+            <Text style={styles.readOnlyValue}>{customerName || 'Не указан'}</Text>
+          </View>
+          {customerPhone ? (
+            <View style={styles.readOnlyRow}>
+              <Text style={styles.readOnlyLabel}>📞 Телефон:</Text>
+              <Text style={styles.readOnlyValue}>{customerPhone}</Text>
+            </View>
+          ) : null}
+          {deliveryAddress ? (
+            <View style={styles.readOnlyRow}>
+              <Text style={styles.readOnlyLabel}>📍 Адрес:</Text>
+              <Text style={styles.readOnlyValue}>{deliveryAddress}</Text>
+            </View>
+          ) : null}
+          {deliveryDate ? (
+            <View style={styles.readOnlyRow}>
+              <Text style={styles.readOnlyLabel}>📅 Доставка:</Text>
+              <Text style={styles.readOnlyValue}>{deliveryDate.split('-').reverse().join('.')}</Text>
+            </View>
+          ) : null}
+          {comment ? (
+            <View style={styles.readOnlyRow}>
+              <Text style={styles.readOnlyLabel}>💬 Комментарий:</Text>
+              <Text style={styles.readOnlyValue}>{comment}</Text>
+            </View>
+          ) : null}
+        </View>
+      ) : (
+        <>
+          <TextInput
+            style={styles.input}
+            placeholder="Имя заказчика *"
+            value={customerName}
+            onChangeText={setCustomerName}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Номер телефона"
+            keyboardType="phone-pad"
+            value={customerPhone}
+            onChangeText={setCustomerPhone}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Адрес доставки"
+            value={deliveryAddress}
+            onChangeText={setDeliveryAddress}
+          />
 
-      <TouchableOpacity
-        style={styles.datePickerBtn}
-        onPress={() => setDateModalVisible(true)}
-      >
-        <Text style={[styles.datePickerText, !!deliveryDate && styles.datePickerTextActive]}>
-          {formatDisplayDate(deliveryDate)}
-        </Text>
-      </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.datePickerBtn}
+            onPress={() => setDateModalVisible(true)}
+          >
+            <Text style={[styles.datePickerText, !!deliveryDate && styles.datePickerTextActive]}>
+              {formatDisplayDate(deliveryDate)}
+            </Text>
+          </TouchableOpacity>
 
-      {/* Опциональное поле комментария к заказу */}
-      <TextInput
-        style={[styles.input, { minHeight: 46 }]}
-        placeholder="Комментарий к заказу (опционально, напр: подъезд 2, домофон 45)"
-        value={comment}
-        onChangeText={setComment}
-        multiline
-      />
+          {/* Опциональное поле комментария к заказу */}
+          <TextInput
+            style={[styles.input, { minHeight: 46 }]}
+            placeholder="Комментарий к заказу (опционально, напр: подъезд 2, домофон 45)"
+            value={comment}
+            onChangeText={setComment}
+            multiline
+          />
+        </>
+      )}
 
       <View style={styles.itemsHeader}>
         <Text style={styles.sectionTitle}>Позиции в заказе ({items.length})</Text>
@@ -347,9 +413,11 @@ export const EditOrderScreen = () => {
         <Text style={styles.submitBtnText}>Сохранить изменения</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteOrder}>
-        <Text style={styles.deleteBtnText}>Удалить весь заказ</Text>
-      </TouchableOpacity>
+      {!isPicker && (
+        <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteOrder}>
+          <Text style={styles.deleteBtnText}>Удалить весь заказ</Text>
+        </TouchableOpacity>
+      )}
 
       <SelectProductModal
         visible={productModalVisible}
@@ -409,6 +477,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: theme.colors.primary,
     fontWeight: '600',
+  },
+  readOnlyCustomerCard: {
+    backgroundColor: '#F5F0E6',
+    borderRadius: theme.radius.sm,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2DAC8',
+    marginBottom: 10,
+  },
+  readOnlyRow: {
+    flexDirection: 'row',
+    marginBottom: 6,
+    alignItems: 'flex-start',
+  },
+  readOnlyLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#6B5E4D',
+    width: 130,
+  },
+  readOnlyValue: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textMain,
   },
   sectionTitle: {
     fontSize: 16,
@@ -516,21 +609,28 @@ const styles = StyleSheet.create({
   },
   statusRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 6,
   },
   statusBtn: {
     flex: 1,
+    minWidth: 70,
     paddingVertical: 8,
     borderRadius: theme.radius.sm,
     backgroundColor: '#F0ECE1',
     alignItems: 'center',
-    marginHorizontal: 3,
   },
   statusBtnActiveFormed: {
     backgroundColor: '#3A5A9F',
   },
-  statusBtnActiveProgress: {
+  statusBtnActiveAssembling: {
     backgroundColor: '#D47A22',
+  },
+  statusBtnActiveAssembled: {
+    backgroundColor: '#0C5460',
+  },
+  statusBtnActiveProgress: {
+    backgroundColor: '#6F42C1',
   },
   statusBtnActiveCompleted: {
     backgroundColor: '#2D6A4F',

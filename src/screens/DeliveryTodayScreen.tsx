@@ -35,16 +35,35 @@ export const DeliveryTodayScreen = () => {
   const driverMode = isCourier && isDriverMode;
   const setDriverMode = setIsDriverMode;
 
+  const isPicker = user?.role === 'picker';
+
   useEffect(() => {
     const unsubscribe = StorageService.subscribeOrders(user?.farmId || '', (all) => {
-      setActiveOrders(all.filter((o) => o.status === 'in_progress'));
+      setActiveOrders(all.filter((o) => ['assembling', 'assembled', 'in_progress'].includes(o.status)));
       setFormedOrders(all.filter((o) => o.status === 'formed'));
     });
     return unsubscribe;
   }, [user?.farmId]);
 
   const handlePickOrder = async (orderId: string) => {
-    await StorageService.updateOrderStatus(orderId, 'in_progress');
+    await StorageService.updateOrderStatus(orderId, 'assembling');
+  };
+
+  const handleAssembleOrder = (orderId: string, customerName: string) => {
+    Alert.alert(
+      'Сборка заказа',
+      `Заказ для "${customerName}" собран?`,
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Да, заказ собран',
+          style: 'default',
+          onPress: async () => {
+            await StorageService.updateOrderStatus(orderId, 'assembled');
+          },
+        },
+      ]
+    );
   };
 
   const handleCompleteOrder = (orderId: string, customerName: string) => {
@@ -66,7 +85,7 @@ export const DeliveryTodayScreen = () => {
 
   const handleReturnToFormed = async (orderId: string) => {
     Alert.alert(
-      'Снять с развозки',
+      'Отложить заказ',
       'Вернуть заказ в статус "Сформирован"?',
       [
         { text: 'Отмена', style: 'cancel' },
@@ -79,6 +98,21 @@ export const DeliveryTodayScreen = () => {
         },
       ]
     );
+  };
+
+  const getStatusBadge = (status: Order['status']) => {
+    switch (status) {
+      case 'assembling':
+        return { label: 'В СБОРКЕ', bg: '#FFF3CD', color: '#856404' };
+      case 'assembled':
+        return { label: 'СОБРАН', bg: '#D1ECF1', color: '#0C5460' };
+      case 'in_progress':
+        return { label: 'В РАБОТЕ', bg: '#FFE8D6', color: '#D47A22' };
+      case 'completed':
+        return { label: 'ЗАВЕРШЕН', bg: '#D8F3DC', color: '#2D6A4F' };
+      default:
+        return { label: 'СФОРМИРОВАН', bg: '#E2EAFc', color: '#3A5A9F' };
+    }
   };
 
 
@@ -184,7 +218,14 @@ export const DeliveryTodayScreen = () => {
               return (
                 <View style={styles.driverCard}>
                   <View style={styles.driverCardHeader}>
-                    <Text style={styles.driverOrderNum}>Остановка #{index + 1}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={styles.driverOrderNum}>Остановка #{index + 1}</Text>
+                      {item.status === 'assembled' && (
+                        <View style={{ backgroundColor: '#D1ECF1', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#0C5460' }}>СОБРАН</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={styles.driverAmount}>{item.totalAmount.toFixed(0)} ₽</Text>
                   </View>
 
@@ -251,6 +292,7 @@ export const DeliveryTodayScreen = () => {
             }
 
             // === РЕЖИМ «ДИСПЕТЧЕР» (Детальный вид, редактирование, откладывание) ===
+            const badge = getStatusBadge(item.status);
             return (
               <View style={styles.card}>
                 <TouchableOpacity
@@ -259,7 +301,9 @@ export const DeliveryTodayScreen = () => {
                 >
                   <View style={styles.cardTop}>
                     <Text style={styles.orderNumber}>#{index + 1} {item.customerName}</Text>
-                    <Text style={styles.statusBadge}>В РАБОТЕ</Text>
+                    <Text style={[styles.statusBadge, { backgroundColor: badge.bg, color: badge.color }]}>
+                      {badge.label}
+                    </Text>
                   </View>
 
                   {item.customerPhone ? (
@@ -314,12 +358,26 @@ export const DeliveryTodayScreen = () => {
                     <Text style={styles.returnBtnText}>Отложить</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={styles.completeBtn}
-                    onPress={() => handleCompleteOrder(item.id, item.customerName)}
-                  >
-                    <Text style={styles.completeBtnText}>✓ Завершен</Text>
-                  </TouchableOpacity>
+                  {isPicker ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.completeBtn,
+                        item.status === 'assembled' ? { backgroundColor: '#0C5460' } : { backgroundColor: '#2D6A4F' },
+                      ]}
+                      onPress={() => handleAssembleOrder(item.id, item.customerName)}
+                    >
+                      <Text style={styles.completeBtnText}>
+                        {item.status === 'assembled' ? '✓ Собран' : '✓ Заказ собран'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.completeBtn}
+                      onPress={() => handleCompleteOrder(item.id, item.customerName)}
+                    >
+                      <Text style={styles.completeBtnText}>✓ Завершен</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             );
@@ -380,7 +438,7 @@ export const DeliveryTodayScreen = () => {
                       setAddModalVisible(false);
                     }}
                   >
-                    <Text style={styles.pickBtnText}>В работу</Text>
+                    <Text style={styles.pickBtnText}>В сборку</Text>
                   </TouchableOpacity>
                 </View>
               )}

@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -21,7 +22,7 @@ export const OrderHistoryScreen = () => {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [filter, setFilter] = useState<'all' | 'completed' | 'formed'>('all');
+  const [filter, setFilter] = useState<'all' | 'completed' | 'assembled' | 'assembling' | 'formed'>('all');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [rangeModalVisible, setRangeModalVisible] = useState(false);
@@ -46,6 +47,10 @@ export const OrderHistoryScreen = () => {
     switch (status) {
       case 'completed':
         return { label: 'ЗАВЕРШЕН', bg: '#D8F3DC', color: '#2D6A4F' };
+      case 'assembled':
+        return { label: 'СОБРАН', bg: '#D1ECF1', color: '#0C5460' };
+      case 'assembling':
+        return { label: 'В СБОРКЕ', bg: '#FFF3CD', color: '#856404' };
       case 'in_progress':
         return { label: 'В РАБОТЕ', bg: '#FFE8D6', color: '#D47A22' };
       case 'formed':
@@ -170,7 +175,7 @@ export const OrderHistoryScreen = () => {
           </Text>
         </TouchableOpacity>
 
-        <View style={styles.filterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
           <TouchableOpacity
             style={[styles.filterBtn, filter === 'all' && styles.filterBtnActive]}
             onPress={() => setFilter('all')}
@@ -184,12 +189,24 @@ export const OrderHistoryScreen = () => {
             <Text style={[styles.filterText, filter === 'completed' && styles.filterTextActive]}>Завершенные</Text>
           </TouchableOpacity>
           <TouchableOpacity
+            style={[styles.filterBtn, filter === 'assembled' && styles.filterBtnActive]}
+            onPress={() => setFilter('assembled')}
+          >
+            <Text style={[styles.filterText, filter === 'assembled' && styles.filterTextActive]}>Собранные</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterBtn, filter === 'assembling' && styles.filterBtnActive]}
+            onPress={() => setFilter('assembling')}
+          >
+            <Text style={[styles.filterText, filter === 'assembling' && styles.filterTextActive]}>В сборке</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.filterBtn, filter === 'formed' && styles.filterBtnActive]}
             onPress={() => setFilter('formed')}
           >
             <Text style={[styles.filterText, filter === 'formed' && styles.filterTextActive]}>Сформированные</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
 
         {/* Панель массовых действий с заказами */}
         {filteredOrders.length > 0 && (

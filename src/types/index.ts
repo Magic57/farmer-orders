@@ -1,6 +1,6 @@
 export type UnitType = 'piece' | 'kg';
 
-export type OrderStatus = 'formed' | 'in_progress' | 'completed';
+export type OrderStatus = 'formed' | 'assembling' | 'assembled' | 'in_progress' | 'completed';
 
 export type UserRole = 'manager' | 'picker' | 'courier'; // Диспетчер / Сборщик / Развозчик
 
