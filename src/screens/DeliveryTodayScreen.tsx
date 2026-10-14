@@ -68,12 +68,12 @@ export const DeliveryTodayScreen = () => {
 
   const handleCompleteOrder = (orderId: string, customerName: string) => {
     Alert.alert(
-      'Завершение заказа',
+      'Доставка заказа',
       `Заказ для "${customerName}" доставлен? Он будет перенесен в Историю.`,
       [
         { text: 'Отмена', style: 'cancel' },
         {
-          text: 'Да, завершить',
+          text: 'Да, доставлен',
           style: 'default',
           onPress: async () => {
             await StorageService.updateOrderStatus(orderId, 'completed');
@@ -128,7 +128,7 @@ export const DeliveryTodayScreen = () => {
       case 'cancelled':
         return { label: 'ОТКАЗ', bg: '#DC3545', color: '#FFFFFF' };
       case 'completed':
-        return { label: 'ЗАВЕРШЕН', bg: '#D8F3DC', color: '#2D6A4F' };
+        return { label: 'ДОСТАВЛЕН', bg: '#D8F3DC', color: '#2D6A4F' };
       default:
         return { label: 'СФОРМИРОВАН', bg: '#E2EAFc', color: '#3A5A9F' };
     }
@@ -413,7 +413,7 @@ export const DeliveryTodayScreen = () => {
                       style={styles.completeBtn}
                       onPress={() => handleCompleteOrder(item.id, item.customerName)}
                     >
-                      <Text style={styles.completeBtnText}>✓ Завершен</Text>
+                      <Text style={styles.completeBtnText}>✓ Доставлен</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -438,7 +438,7 @@ export const DeliveryTodayScreen = () => {
               <Text style={styles.emptyIcon}>📦</Text>
               <Text style={styles.emptyTitle}>Нет доступных заказов</Text>
               <Text style={styles.emptySubtitle}>
-                Все заказы либо уже взяты в работу, либо завершены. Создайте новый заказ во вкладке «Новый заказ».
+                Все заказы либо уже взяты в работу, либо доставлены. Создайте новый заказ во вкладке «Новый заказ».
               </Text>
             </View>
           ) : (

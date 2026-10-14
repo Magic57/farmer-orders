@@ -306,7 +306,7 @@ export const EditOrderScreen = () => {
               }}
             >
               <Text style={[styles.statusBtnText, order?.status === 'completed' && styles.statusBtnTextActive]}>
-                Завершен
+                Доставлен
               </Text>
             </TouchableOpacity>
           </View>

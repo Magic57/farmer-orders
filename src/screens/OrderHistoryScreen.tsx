@@ -46,7 +46,7 @@ export const OrderHistoryScreen = () => {
   const getStatusBadge = (status: Order['status']) => {
     switch (status) {
       case 'completed':
-        return { label: 'ЗАВЕРШЕН', bg: '#D8F3DC', color: '#2D6A4F' };
+        return { label: 'ДОСТАВЛЕН', bg: '#D8F3DC', color: '#2D6A4F' };
       case 'assembled':
         return { label: 'СОБРАН', bg: '#D1ECF1', color: '#0C5460' };
       case 'assembling':
@@ -75,9 +75,9 @@ export const OrderHistoryScreen = () => {
       return false;
     }
 
-    // Фильтр по дате завершения
+    // Фильтр по дате доставки
     if (startDate && endDate) {
-      // Дата завершения (если есть completedAt, иначе fallback на createdAt если завершен или отказ)
+      // Дата доставки (если есть completedAt, иначе fallback на createdAt если доставлен или отказ)
       const completionTime = o.completedAt || ((o.status === 'completed' || o.status === 'cancelled') ? o.createdAt : null);
       if (!completionTime) return false;
 
@@ -93,7 +93,7 @@ export const OrderHistoryScreen = () => {
   const totalSumFiltered = filteredOrders.reduce((sum, o) => sum + o.totalAmount, 0);
 
   const formatRangeLabel = () => {
-    if (!startDate) return '📅 Фильтр по дате завершения';
+    if (!startDate) return '📅 Фильтр по дате доставки';
     const s = startDate.split('-').reverse().join('.');
     const e = endDate ? endDate.split('-').reverse().join('.') : s;
     return `📅 С ${s} по ${e} ✕`;
@@ -188,7 +188,7 @@ export const OrderHistoryScreen = () => {
             style={[styles.filterBtn, filter === 'completed' && styles.filterBtnActive]}
             onPress={() => setFilter('completed')}
           >
-            <Text style={[styles.filterText, filter === 'completed' && styles.filterTextActive]}>Завершенные</Text>
+            <Text style={[styles.filterText, filter === 'completed' && styles.filterTextActive]}>Доставленные</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.filterBtn, filter === 'assembled' && styles.filterBtnActive]}
@@ -258,9 +258,9 @@ export const OrderHistoryScreen = () => {
           <Text style={styles.emptyTitle}>Заказов не найдено</Text>
           <Text style={styles.emptySubtitle}>
             {startDate
-              ? 'В выбранном диапазоне дат нет завершенных заказов. Попробуйте сбросить фильтр дат.'
+              ? 'В выбранном диапазоне дат нет доставленных заказов. Попробуйте сбросить фильтр дат.'
               : filter === 'completed'
-              ? 'Завершенные заказы появятся здесь после доставки.'
+              ? 'Доставленные заказы появятся здесь после доставки.'
               : 'Оформите заказ на вкладке «Новый заказ».'}
           </Text>
         </View>
@@ -309,7 +309,7 @@ export const OrderHistoryScreen = () => {
                 >
                   {item.completedAt ? (
                     <Text style={styles.completedDateText}>
-                      ✅ Завершен: {formatDate(item.completedAt)}
+                      {item.status === 'cancelled' ? `❌ Отказ: ${formatDate(item.completedAt)}` : `✅ Доставлен: ${formatDate(item.completedAt)}`}
                     </Text>
                   ) : (
                     <Text style={styles.date}>Создан: {formatDate(item.createdAt)}</Text>
