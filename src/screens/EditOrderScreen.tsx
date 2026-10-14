@@ -232,72 +232,74 @@ export const EditOrderScreen = () => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.statusSection}>
-        <Text style={styles.statusLabel}>Статус заказа:</Text>
-        <View style={styles.statusRow}>
-          <TouchableOpacity
-            style={[styles.statusBtn, (order?.status || 'formed') === 'formed' && styles.statusBtnActiveFormed]}
-            onPress={async () => {
-              await StorageService.updateOrderStatus(orderId, 'formed');
-              setOrder((prev) => prev ? { ...prev, status: 'formed' } : null);
-            }}
-          >
-            <Text style={[styles.statusBtnText, (order?.status || 'formed') === 'formed' && styles.statusBtnTextActive]}>
-              Сформирован
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.statusBtn, order?.status === 'assembling' && styles.statusBtnActiveAssembling]}
-            onPress={async () => {
-              await StorageService.updateOrderStatus(orderId, 'assembling');
-              setOrder((prev) => prev ? { ...prev, status: 'assembling' } : null);
-            }}
-          >
-            <Text style={[styles.statusBtnText, order?.status === 'assembling' && styles.statusBtnTextActive]}>
-              В сборке
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.statusBtn, order?.status === 'assembled' && styles.statusBtnActiveAssembled]}
-            onPress={async () => {
-              await StorageService.updateOrderStatus(orderId, 'assembled');
-              setOrder((prev) => prev ? { ...prev, status: 'assembled' } : null);
-            }}
-          >
-            <Text style={[styles.statusBtnText, order?.status === 'assembled' && styles.statusBtnTextActive]}>
-              Собран
-            </Text>
-          </TouchableOpacity>
-
-          {order?.status === 'in_progress' && (
+      {!isPicker && (
+        <View style={styles.statusSection}>
+          <Text style={styles.statusLabel}>Статус заказа:</Text>
+          <View style={styles.statusRow}>
             <TouchableOpacity
-              style={[styles.statusBtn, styles.statusBtnActiveProgress]}
+              style={[styles.statusBtn, (order?.status || 'formed') === 'formed' && styles.statusBtnActiveFormed]}
               onPress={async () => {
-                await StorageService.updateOrderStatus(orderId, 'in_progress');
-                setOrder((prev) => prev ? { ...prev, status: 'in_progress' } : null);
+                await StorageService.updateOrderStatus(orderId, 'formed');
+                setOrder((prev) => prev ? { ...prev, status: 'formed' } : null);
               }}
             >
-              <Text style={[styles.statusBtnText, styles.statusBtnTextActive]}>
-                В работе
+              <Text style={[styles.statusBtnText, (order?.status || 'formed') === 'formed' && styles.statusBtnTextActive]}>
+                Сформирован
               </Text>
             </TouchableOpacity>
-          )}
 
-          <TouchableOpacity
-            style={[styles.statusBtn, order?.status === 'completed' && styles.statusBtnActiveCompleted]}
-            onPress={async () => {
-              await StorageService.updateOrderStatus(orderId, 'completed');
-              setOrder((prev) => prev ? { ...prev, status: 'completed' } : null);
-            }}
-          >
-            <Text style={[styles.statusBtnText, order?.status === 'completed' && styles.statusBtnTextActive]}>
-              Завершен
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.statusBtn, order?.status === 'assembling' && styles.statusBtnActiveAssembling]}
+              onPress={async () => {
+                await StorageService.updateOrderStatus(orderId, 'assembling');
+                setOrder((prev) => prev ? { ...prev, status: 'assembling' } : null);
+              }}
+            >
+              <Text style={[styles.statusBtnText, order?.status === 'assembling' && styles.statusBtnTextActive]}>
+                В сборке
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.statusBtn, order?.status === 'assembled' && styles.statusBtnActiveAssembled]}
+              onPress={async () => {
+                await StorageService.updateOrderStatus(orderId, 'assembled');
+                setOrder((prev) => prev ? { ...prev, status: 'assembled' } : null);
+              }}
+            >
+              <Text style={[styles.statusBtnText, order?.status === 'assembled' && styles.statusBtnTextActive]}>
+                Собран
+              </Text>
+            </TouchableOpacity>
+
+            {order?.status === 'in_progress' && (
+              <TouchableOpacity
+                style={[styles.statusBtn, styles.statusBtnActiveProgress]}
+                onPress={async () => {
+                  await StorageService.updateOrderStatus(orderId, 'in_progress');
+                  setOrder((prev) => prev ? { ...prev, status: 'in_progress' } : null);
+                }}
+              >
+                <Text style={[styles.statusBtnText, styles.statusBtnTextActive]}>
+                  В работе
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[styles.statusBtn, order?.status === 'completed' && styles.statusBtnActiveCompleted]}
+              onPress={async () => {
+                await StorageService.updateOrderStatus(orderId, 'completed');
+                setOrder((prev) => prev ? { ...prev, status: 'completed' } : null);
+              }}
+            >
+              <Text style={[styles.statusBtnText, order?.status === 'completed' && styles.statusBtnTextActive]}>
+                Завершен
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      )}
 
       <View style={styles.customerHeader}>
         <Text style={styles.sectionTitle}>Контакты заказчика</Text>
