@@ -90,7 +90,10 @@ export const OrderHistoryScreen = () => {
     return true;
   });
 
-  const totalSumFiltered = filteredOrders.reduce((sum, o) => sum + o.totalAmount, 0);
+  // Выручка считается только по заказам со статусом "Доставлен" (исключая "Отказ" и другие статусы)
+  const totalSumFiltered = filteredOrders
+    .filter((o) => o.status === 'completed')
+    .reduce((sum, o) => sum + o.totalAmount, 0);
 
   const formatRangeLabel = () => {
     if (!startDate) return '📅 Фильтр по дате доставки';
