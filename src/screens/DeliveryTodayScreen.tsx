@@ -30,9 +30,9 @@ export const DeliveryTodayScreen = () => {
   const [prepModalVisible, setPrepModalVisible] = useState(false);
 
   // Тогглер отображается и работает только для роли 'courier' (позволяет развозчику переключаться между простым видом и диспетчерским)
-  // Для диспетчера и сборщика всегда false (полный диспетчерский вид)
+  // Для диспетчера и сборщика всегда false (полный диспетчерский/сборочный вид с возможностью редактирования)
   const isCourier = user?.role === 'courier';
-  const driverMode = isDriverMode;
+  const driverMode = isCourier && isDriverMode;
   const setDriverMode = setIsDriverMode;
 
   useEffect(() => {
@@ -354,9 +354,19 @@ export const DeliveryTodayScreen = () => {
                 <View style={styles.modalCard}>
                   <View style={styles.modalCardInfo}>
                     <Text style={styles.modalCustomerName}>{item.customerName}</Text>
+                    {item.deliveryDate ? (
+                      <Text style={styles.modalDeliveryDate}>
+                        📅 Доставка: {item.deliveryDate.split('-').reverse().join('.')}
+                      </Text>
+                    ) : null}
                     {item.deliveryAddress ? (
                       <Text style={styles.modalAddress} numberOfLines={1}>
                         📍 {item.deliveryAddress}
+                      </Text>
+                    ) : null}
+                    {item.comment ? (
+                      <Text style={styles.modalComment} numberOfLines={1}>
+                        💬 {item.comment}
                       </Text>
                     ) : null}
                     <Text style={styles.modalAmount}>
@@ -689,10 +699,27 @@ const styles = StyleSheet.create({
     color: theme.colors.textMain,
     marginBottom: 2,
   },
+  modalDeliveryDate: {
+    fontSize: 13,
+    color: theme.colors.primary,
+    fontWeight: '700',
+    marginBottom: 3,
+  },
   modalAddress: {
     fontSize: 13,
     color: theme.colors.textMuted,
+    marginBottom: 3,
+  },
+  modalComment: {
+    fontSize: 12,
+    color: '#5D4037',
+    backgroundColor: '#FFFDE7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: theme.radius.sm,
+    alignSelf: 'flex-start',
     marginBottom: 4,
+    fontStyle: 'italic',
   },
   modalAmount: {
     fontSize: 13,

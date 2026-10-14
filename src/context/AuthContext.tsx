@@ -83,6 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (user?.uid) {
       await AuthService.updateUserRole(user.uid, newRole);
       setUser((prev) => (prev ? { ...prev, role: newRole } : null));
+      setIsDriverMode(newRole === 'courier');
     }
   };
 
