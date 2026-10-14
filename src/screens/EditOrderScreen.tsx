@@ -287,6 +287,18 @@ export const EditOrderScreen = () => {
             )}
 
             <TouchableOpacity
+              style={[styles.statusBtn, order?.status === 'cancelled' && styles.statusBtnActiveCancelled]}
+              onPress={async () => {
+                await StorageService.updateOrderStatus(orderId, 'cancelled');
+                setOrder((prev) => prev ? { ...prev, status: 'cancelled' } : null);
+              }}
+            >
+              <Text style={[styles.statusBtnText, order?.status === 'cancelled' && styles.statusBtnTextActive]}>
+                Отказ
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[styles.statusBtn, order?.status === 'completed' && styles.statusBtnActiveCompleted]}
               onPress={async () => {
                 await StorageService.updateOrderStatus(orderId, 'completed');
@@ -636,6 +648,9 @@ const styles = StyleSheet.create({
   },
   statusBtnActiveCompleted: {
     backgroundColor: '#2D6A4F',
+  },
+  statusBtnActiveCancelled: {
+    backgroundColor: '#DC3545',
   },
   statusBtnText: {
     fontSize: 12,

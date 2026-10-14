@@ -22,7 +22,7 @@ export const OrderHistoryScreen = () => {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [filter, setFilter] = useState<'all' | 'completed' | 'assembled' | 'assembling' | 'formed'>('all');
+  const [filter, setFilter] = useState<'all' | 'completed' | 'assembled' | 'assembling' | 'formed' | 'cancelled'>('all');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [rangeModalVisible, setRangeModalVisible] = useState(false);
@@ -53,6 +53,8 @@ export const OrderHistoryScreen = () => {
         return { label: 'В СБОРКЕ', bg: '#FFF3CD', color: '#856404' };
       case 'in_progress':
         return { label: 'В РАБОТЕ', bg: '#FFE8D6', color: '#D47A22' };
+      case 'cancelled':
+        return { label: 'ОТКАЗ', bg: '#DC3545', color: '#FFFFFF' };
       case 'formed':
       default:
         return { label: 'СФОРМИРОВАН', bg: '#E2EAFc', color: '#3A5A9F' };
@@ -75,8 +77,8 @@ export const OrderHistoryScreen = () => {
 
     // Фильтр по дате завершения
     if (startDate && endDate) {
-      // Дата завершения (если есть completedAt, иначе fallback на createdAt если завершен)
-      const completionTime = o.completedAt || (o.status === 'completed' ? o.createdAt : null);
+      // Дата завершения (если есть completedAt, иначе fallback на createdAt если завершен или отказ)
+      const completionTime = o.completedAt || ((o.status === 'completed' || o.status === 'cancelled') ? o.createdAt : null);
       if (!completionTime) return false;
 
       const orderYMD = formatTimestampToYMD(completionTime);
@@ -205,6 +207,12 @@ export const OrderHistoryScreen = () => {
             onPress={() => setFilter('formed')}
           >
             <Text style={[styles.filterText, filter === 'formed' && styles.filterTextActive]}>Сформированные</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterBtn, filter === 'cancelled' && { backgroundColor: '#DC3545' }]}
+            onPress={() => setFilter('cancelled')}
+          >
+            <Text style={[styles.filterText, filter === 'cancelled' && styles.filterTextActive]}>Отказы</Text>
           </TouchableOpacity>
         </ScrollView>
 

@@ -221,14 +221,14 @@ export const StorageService = {
       const index = orders.findIndex((o) => o.id === id);
       if (index >= 0) {
         orders[index].status = status;
-        if (status === 'completed') {
+        if (status === 'completed' || status === 'cancelled') {
           orders[index].completedAt = Date.now();
         }
         await AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
       }
 
       const updates: any = { status };
-      if (status === 'completed') {
+      if (status === 'completed' || status === 'cancelled') {
         updates.completedAt = Date.now();
       }
       await updateDoc(doc(db, 'orders', id), updates).catch((err) => {

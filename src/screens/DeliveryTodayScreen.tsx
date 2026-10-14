@@ -83,6 +83,23 @@ export const DeliveryTodayScreen = () => {
     );
   };
 
+  const handleRefuseOrder = (orderId: string, customerName: string) => {
+    Alert.alert(
+      'Отказ от заказа',
+      `Клиент "${customerName}" отказался от заказа? Он будет перенесен в Историю со статусом "Отказ".`,
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Да, отказ',
+          style: 'destructive',
+          onPress: async () => {
+            await StorageService.updateOrderStatus(orderId, 'cancelled');
+          },
+        },
+      ]
+    );
+  };
+
   const handleReturnToFormed = async (orderId: string) => {
     Alert.alert(
       'Отложить заказ',
@@ -108,6 +125,8 @@ export const DeliveryTodayScreen = () => {
         return { label: 'СОБРАН', bg: '#D1ECF1', color: '#0C5460' };
       case 'in_progress':
         return { label: 'В РАБОТЕ', bg: '#FFE8D6', color: '#D47A22' };
+      case 'cancelled':
+        return { label: 'ОТКАЗ', bg: '#DC3545', color: '#FFFFFF' };
       case 'completed':
         return { label: 'ЗАВЕРШЕН', bg: '#D8F3DC', color: '#2D6A4F' };
       default:
@@ -279,14 +298,24 @@ export const DeliveryTodayScreen = () => {
                     </View>
                   ) : null}
 
-                  {/* Огромная кнопка ДОСТАВЛЕНО */}
-                  <TouchableOpacity
-                    style={styles.driverCompleteBtn}
-                    onPress={() => handleCompleteOrder(item.id, item.customerName)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.driverCompleteBtnText}>✓ ДОСТАВЛЕНО ({item.totalAmount.toFixed(0)} ₽)</Text>
-                  </TouchableOpacity>
+                  {/* Кнопки для роли развозчик: ОТКАЗ и ДОСТАВЛЕНО */}
+                  <View style={styles.driverButtonsRow}>
+                    <TouchableOpacity
+                      style={styles.driverRefuseBtn}
+                      onPress={() => handleRefuseOrder(item.id, item.customerName)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.driverRefuseBtnText}>✕ Отказ</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.driverCompleteBtn}
+                      onPress={() => handleCompleteOrder(item.id, item.customerName)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.driverCompleteBtnText}>✓ ДОСТАВЛЕНО ({item.totalAmount.toFixed(0)} ₽)</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               );
             }
@@ -357,6 +386,15 @@ export const DeliveryTodayScreen = () => {
                   >
                     <Text style={styles.returnBtnText}>Отложить</Text>
                   </TouchableOpacity>
+
+                  {!isPicker && (
+                    <TouchableOpacity
+                      style={styles.refuseBtn}
+                      onPress={() => handleRefuseOrder(item.id, item.customerName)}
+                    >
+                      <Text style={styles.refuseBtnText}>Отказ</Text>
+                    </TouchableOpacity>
+                  )}
 
                   {isPicker ? (
                     <TouchableOpacity
@@ -668,9 +706,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  refuseBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.sm,
+    backgroundColor: '#DC3545',
+    marginLeft: 8,
+  },
+  refuseBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   completeBtn: {
     flex: 1,
-    marginLeft: 10,
+    marginLeft: 8,
     backgroundColor: theme.colors.primary,
     paddingVertical: 10,
     borderRadius: theme.radius.sm,
@@ -975,7 +1025,27 @@ const styles = StyleSheet.create({
     color: theme.colors.textMain,
     lineHeight: 22,
   },
+  driverButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  driverRefuseBtn: {
+    backgroundColor: '#DC3545',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: theme.radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+  },
+  driverRefuseBtnText: {
+    color: theme.colors.white,
+    fontSize: 16,
+    fontWeight: '900',
+  },
   driverCompleteBtn: {
+    flex: 1,
     backgroundColor: theme.colors.primary,
     paddingVertical: 16,
     borderRadius: theme.radius.md,
@@ -985,9 +1055,9 @@ const styles = StyleSheet.create({
   },
   driverCompleteBtnText: {
     color: theme.colors.white,
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   driverCommentBox: {
     backgroundColor: '#FFFDE7',
