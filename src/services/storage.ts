@@ -22,8 +22,10 @@ export const StorageService = {
 
   // Подписка на обновление товаров в реальном времени
   subscribeProducts(farmId: string, callback: (products: Product[]) => void) {
+    // Сначала сразу отдаем локальный кеш
+    this.getProducts().then(callback);
+
     if (!farmId) {
-      this.getProducts().then(callback);
       return () => {};
     }
 
@@ -39,7 +41,7 @@ export const StorageService = {
         callback(list);
       },
       (err) => {
-        console.error('Ошибка подписки на товары:', err);
+        console.warn('Оффлайн-режим подписки на товары:', err);
         this.getProducts().then(callback);
       }
     );
@@ -47,8 +49,10 @@ export const StorageService = {
 
   // Подписка на обновление заказов в реальном времени
   subscribeOrders(farmId: string, callback: (orders: Order[]) => void) {
+    // Сначала сразу отдаем локальный кеш
+    this.getOrders().then(callback);
+
     if (!farmId) {
-      this.getOrders().then(callback);
       return () => {};
     }
 
@@ -64,7 +68,7 @@ export const StorageService = {
         callback(list);
       },
       (err) => {
-        console.error('Ошибка подписки на заказы:', err);
+        console.warn('Оффлайн-режим подписки на заказы:', err);
         this.getOrders().then(callback);
       }
     );
@@ -72,8 +76,10 @@ export const StorageService = {
 
   // Подписка на клиентов в реальном времени
   subscribeCustomers(farmId: string, callback: (customers: Customer[]) => void) {
+    // Сначала сразу отдаем локальный кеш
+    this.getCustomers().then(callback);
+
     if (!farmId) {
-      this.getCustomers().then(callback);
       return () => {};
     }
 
@@ -98,7 +104,7 @@ export const StorageService = {
         callback(list);
       },
       (err) => {
-        console.error('Ошибка подписки на клиентов:', err);
+        console.warn('Оффлайн-режим подписки на клиентов:', err);
         this.getCustomers().then(callback);
       }
     );
@@ -152,11 +158,7 @@ export const StorageService = {
         ...(product.imageUri ? { imageUri: product.imageUri } : {}),
       };
 
-      if (targetFarmId) {
-        await setDoc(doc(db, 'products', product.id), prodToSave);
-      }
-
-      // Локальный кеш
+      // Локальный кеш сохраняем обязательно
       const products = await this.getProducts();
       const index = products.findIndex((p) => p.id === product.id);
       if (index >= 0) {
@@ -165,6 +167,13 @@ export const StorageService = {
         products.unshift(prodToSave);
       }
       await AsyncStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
+
+      // Синхронизация с Firestore (если есть связь)
+      if (targetFarmId) {
+        await setDoc(doc(db, 'products', product.id), prodToSave).catch((err) => {
+          console.warn('Товар сохранен локально, синхронизация с облаком отложена (оффлайн):', err);
+        });
+      }
     } catch (e) {
       console.error('Ошибка сохранения товара:', e);
       throw e;
@@ -173,10 +182,13 @@ export const StorageService = {
 
   async deleteProduct(id: string): Promise<void> {
     try {
-      await deleteDoc(doc(db, 'products', id));
       const products = await this.getProducts();
       const filtered = products.filter((p) => p.id !== id);
       await AsyncStorage.setItem(PRODUCTS_KEY, JSON.stringify(filtered));
+
+      await deleteDoc(doc(db, 'products', id)).catch((err) => {
+        console.warn('Удаление товара выполнено локально (оффлайн):', err);
+      });
     } catch (e) {
       console.error('Ошибка удаления товара:', e);
       throw e;
@@ -205,12 +217,6 @@ export const StorageService = {
 
   async updateOrderStatus(id: string, status: Order['status']): Promise<void> {
     try {
-      const updates: any = { status };
-      if (status === 'completed') {
-        updates.completedAt = Date.now();
-      }
-      await updateDoc(doc(db, 'orders', id), updates).catch(() => {});
-
       const orders = await this.getOrders();
       const index = orders.findIndex((o) => o.id === id);
       if (index >= 0) {
@@ -220,6 +226,14 @@ export const StorageService = {
         }
         await AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
       }
+
+      const updates: any = { status };
+      if (status === 'completed') {
+        updates.completedAt = Date.now();
+      }
+      await updateDoc(doc(db, 'orders', id), updates).catch((err) => {
+        console.warn('Статус заказа обновлен локально (оффлайн):', err);
+      });
     } catch (e) {
       console.error(e);
     }
@@ -258,10 +272,7 @@ export const StorageService = {
       if (order.comment) orderToSave.comment = order.comment;
       if (order.completedAt) orderToSave.completedAt = order.completedAt;
 
-      if (targetFarmId) {
-        await setDoc(doc(db, 'orders', order.id), orderToSave);
-      }
-
+      // Локальный кеш сохраняем сразу
       const orders = await this.getOrders();
       const index = orders.findIndex((o) => o.id === order.id);
       if (index >= 0) {
@@ -270,6 +281,13 @@ export const StorageService = {
         orders.unshift(orderToSave);
       }
       await AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+
+      // Синхронизация с Firestore
+      if (targetFarmId) {
+        await setDoc(doc(db, 'orders', order.id), orderToSave).catch((err) => {
+          console.warn('Заказ сохранен локально, синхронизация с облаком отложена (оффлайн):', err);
+        });
+      }
     } catch (e) {
       console.error('Ошибка сохранения заказа:', e);
       throw e;
@@ -278,10 +296,13 @@ export const StorageService = {
 
   async deleteOrder(id: string): Promise<void> {
     try {
-      await deleteDoc(doc(db, 'orders', id)).catch(() => {});
       const orders = await this.getOrders();
       const filtered = orders.filter((o) => o.id !== id);
       await AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(filtered));
+
+      await deleteDoc(doc(db, 'orders', id)).catch((err) => {
+        console.warn('Удаление заказа выполнено локально (оффлайн):', err);
+      });
     } catch (e) {
       console.error('Ошибка удаления заказа:', e);
       throw e;
@@ -352,10 +373,6 @@ export const StorageService = {
         createdAt: found?.createdAt || customer.createdAt || Date.now(),
       };
 
-      if (targetFarmId) {
-        await setDoc(doc(db, 'customers', targetId), custToSave);
-      }
-
       const index = existingCustomers.findIndex((c) => c.id === targetId);
       if (index >= 0) {
         existingCustomers[index] = custToSave;
@@ -363,6 +380,12 @@ export const StorageService = {
         existingCustomers.unshift(custToSave);
       }
       await AsyncStorage.setItem(CUSTOMERS_KEY, JSON.stringify(existingCustomers));
+
+      if (targetFarmId) {
+        await setDoc(doc(db, 'customers', targetId), custToSave).catch((err) => {
+          console.warn('Клиент сохранен локально, синхронизация с облаком отложена (оффлайн):', err);
+        });
+      }
     } catch (e) {
       console.error('Ошибка сохранения заказчика:', e);
     }
@@ -370,10 +393,13 @@ export const StorageService = {
 
   async deleteCustomer(id: string): Promise<void> {
     try {
-      await deleteDoc(doc(db, 'customers', id)).catch(() => {});
       const customers = await this.getCustomers();
       const filtered = customers.filter((c) => c.id !== id);
       await AsyncStorage.setItem(CUSTOMERS_KEY, JSON.stringify(filtered));
+
+      await deleteDoc(doc(db, 'customers', id)).catch((err) => {
+        console.warn('Клиент удален локально (оффлайн):', err);
+      });
     } catch (e) {
       console.error('Ошибка удаления заказчика:', e);
     }

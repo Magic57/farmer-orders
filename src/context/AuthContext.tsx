@@ -25,19 +25,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isDriverMode, setIsDriverMode] = useState<boolean>(false);
 
   useEffect(() => {
+    let isMounted = true;
+
+    // Сначала мгновенно загружаем локально сохранённый профиль (для работы без интернета)
+    AuthService.getCachedProfile().then((cached) => {
+      if (isMounted && cached) {
+        setUser(cached);
+        setIsDriverMode(cached.role === 'courier');
+        setLoading(false);
+      }
+    });
+
     const unsubscribe = AuthService.subscribeAuth(async (firebaseUser) => {
       if (firebaseUser) {
         const profile = await AuthService.getUserProfile(firebaseUser.uid);
-        setUser(profile);
-        setIsDriverMode(profile?.role === 'courier');
+        if (isMounted) {
+          if (profile) {
+            setUser(profile);
+            setIsDriverMode(profile.role === 'courier');
+          }
+          setLoading(false);
+        }
       } else {
-        setUser(null);
-        setIsDriverMode(false);
+        // Если firebaseUser === null, проверяем есть ли текущий пользователь в auth или кеш
+        const currentCached = await AuthService.getCachedProfile();
+        if (isMounted) {
+          if (currentCached && auth.currentUser) {
+            setUser(currentCached);
+            setIsDriverMode(currentCached.role === 'courier');
+          } else if (!auth.currentUser) {
+            setUser(null);
+            setIsDriverMode(false);
+          }
+          setLoading(false);
+        }
       }
-      setLoading(false);
     });
 
-    return unsubscribe;
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, pass: string) => {

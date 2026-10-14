@@ -19,6 +19,9 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { UserProfile, UserRole, Farm } from '../types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const CACHED_USER_KEY = '@farmer_cached_user';
 
 export const AuthService = {
   // Слушатель состояния входа
@@ -30,17 +33,43 @@ export const AuthService = {
     return auth.currentUser;
   },
 
+  // Получить профиль из локального кеша (работает мгновенно и без интернета)
+  async getCachedProfile(): Promise<UserProfile | null> {
+    try {
+      const data = await AsyncStorage.getItem(CACHED_USER_KEY);
+      return data ? JSON.parse(data) : null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  // Сохранить профиль в локальный кеш
+  async saveCachedProfile(profile: UserProfile | null): Promise<void> {
+    try {
+      if (profile) {
+        await AsyncStorage.setItem(CACHED_USER_KEY, JSON.stringify(profile));
+      } else {
+        await AsyncStorage.removeItem(CACHED_USER_KEY);
+      }
+    } catch (e) {
+      console.error('Ошибка сохранения кеша пользователя:', e);
+    }
+  },
+
   // Получить профиль текущего пользователя
   async getUserProfile(uid: string): Promise<UserProfile | null> {
     try {
       const snap = await getDoc(doc(db, 'users', uid));
       if (snap.exists()) {
-        return snap.data() as UserProfile;
+        const profile = snap.data() as UserProfile;
+        await this.saveCachedProfile(profile);
+        return profile;
       }
-      return null;
+      // Если snap не существует на сервере, проверяем кеш
+      return await this.getCachedProfile();
     } catch (e) {
-      console.error('Ошибка получения профиля:', e);
-      return null;
+      console.warn('Сетевая ошибка получения профиля, используем локальный кеш:', e);
+      return await this.getCachedProfile();
     }
   },
 
@@ -132,7 +161,11 @@ export const AuthService = {
   },
 
   async logout(): Promise<void> {
-    await signOut(auth);
+    try {
+      await signOut(auth);
+    } finally {
+      await this.saveCachedProfile(null);
+    }
   },
 
   async resetPassword(email: string): Promise<void> {
@@ -140,7 +173,11 @@ export const AuthService = {
   },
 
   async updateUserRole(uid: string, role: UserRole): Promise<void> {
-    await setDoc(doc(db, 'users', uid), { role }, { merge: true });
+    await setDoc(doc(db, 'users', uid), { role }, { merge: true }).catch(() => {});
+    const cached = await this.getCachedProfile();
+    if (cached && cached.uid === uid) {
+      await this.saveCachedProfile({ ...cached, role });
+    }
   },
 
   // Получить список всех пользователей хозяйства
