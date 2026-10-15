@@ -448,36 +448,67 @@ export const DeliveryTodayScreen = () => {
               contentContainerStyle={styles.list}
               renderItem={({ item }) => (
                 <View style={styles.modalCard}>
-                  <View style={styles.modalCardInfo}>
+                  <View style={styles.modalCardHeader}>
                     <Text style={styles.modalCustomerName}>{item.customerName}</Text>
-                    {item.deliveryDate ? (
+                    <View style={styles.modalDateBadge}>
                       <Text style={styles.modalDeliveryDate}>
-                        📅 Доставка: {item.deliveryDate.split('-').reverse().join('.')}
+                        📅 {item.deliveryDate ? item.deliveryDate.split('-').reverse().join('.') : 'Дата не указана'}
                       </Text>
-                    ) : null}
-                    {item.deliveryAddress ? (
-                      <Text style={styles.modalAddress} numberOfLines={1}>
-                        📍 {item.deliveryAddress}
-                      </Text>
-                    ) : null}
-                    {item.comment ? (
-                      <Text style={styles.modalComment} numberOfLines={1}>
-                        💬 {item.comment}
-                      </Text>
-                    ) : null}
-                    <Text style={styles.modalAmount}>
-                      {item.items.length} поз. • {item.totalAmount.toFixed(2)} ₽
-                    </Text>
+                    </View>
                   </View>
-                  <TouchableOpacity
-                    style={styles.pickBtn}
-                    onPress={() => {
-                      handlePickOrder(item.id);
-                      setAddModalVisible(false);
-                    }}
-                  >
-                    <Text style={styles.pickBtnText}>В сборку</Text>
-                  </TouchableOpacity>
+
+                  {item.deliveryAddress ? (
+                    <Text style={styles.modalAddress}>
+                      📍 {item.deliveryAddress}
+                    </Text>
+                  ) : null}
+
+                  {item.comment ? (
+                    <Text style={styles.modalComment}>
+                      💬 {item.comment}
+                    </Text>
+                  ) : null}
+
+                  {/* Список заказанных товаров */}
+                  <View style={styles.modalItemsBox}>
+                    <Text style={styles.modalItemsTitle}>Заказанные товары:</Text>
+                    {item.items && item.items.length > 0 ? (
+                      item.items.map((i, idx) => {
+                        let qtyStr = '';
+                        if (i.unit === 'kg') {
+                          const pieces = i.piecesCount ? `${i.piecesCount} шт` : '';
+                          const weight = i.actualWeight && i.actualWeight > 0 ? `${i.actualWeight} кг` : `${i.quantity} кг`;
+                          qtyStr = pieces ? `${pieces}, ${weight}` : weight;
+                        } else {
+                          qtyStr = `${i.quantity} шт`;
+                        }
+                        return (
+                          <Text key={idx} style={styles.modalItemRow}>
+                            • {i.productName}: <Text style={styles.modalItemQty}>{qtyStr}</Text>
+                          </Text>
+                        );
+                      })
+                    ) : (
+                      <Text style={styles.modalItemEmpty}>Нет товаров</Text>
+                    )}
+                  </View>
+
+                  <View style={styles.modalCardFooter}>
+                    <View>
+                      <Text style={styles.modalAmountLabel}>Сумма заказа:</Text>
+                      <Text style={styles.modalAmount}>{item.totalAmount.toFixed(2)} ₽</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.pickBtn}
+                      onPress={() => {
+                        handlePickOrder(item.id);
+                        setAddModalVisible(false);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.pickBtnText}>В сборку ➔</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
             />
@@ -790,54 +821,106 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.cardBg,
     borderRadius: theme.radius.md,
     padding: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  modalCardInfo: {
-    flex: 1,
-    paddingRight: 8,
+  modalCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 6,
   },
   modalCustomerName: {
+    flex: 1,
     fontSize: 16,
     fontWeight: '700',
     color: theme.colors.textMain,
-    marginBottom: 2,
+    marginRight: 8,
+  },
+  modalDateBadge: {
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: theme.radius.sm,
   },
   modalDeliveryDate: {
-    fontSize: 13,
+    fontSize: 12,
     color: theme.colors.primary,
     fontWeight: '700',
-    marginBottom: 3,
   },
   modalAddress: {
     fontSize: 13,
     color: theme.colors.textMuted,
-    marginBottom: 3,
+    marginBottom: 4,
   },
   modalComment: {
     fontSize: 12,
     color: '#5D4037',
     backgroundColor: '#FFFDE7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: theme.radius.sm,
     alignSelf: 'flex-start',
-    marginBottom: 4,
+    marginBottom: 8,
     fontStyle: 'italic',
   },
-  modalAmount: {
+  modalItemsBox: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: theme.radius.sm,
+    padding: 10,
+    marginTop: 4,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#ECEFF1',
+  },
+  modalItemsTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.textMuted,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  modalItemRow: {
     fontSize: 13,
-    fontWeight: '600',
+    color: theme.colors.textMain,
+    lineHeight: 19,
+  },
+  modalItemQty: {
+    fontWeight: '700',
+    color: theme.colors.primary,
+  },
+  modalItemEmpty: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    fontStyle: 'italic',
+  },
+  modalCardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  modalAmountLabel: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+  },
+  modalAmount: {
+    fontSize: 16,
+    fontWeight: '700',
     color: theme.colors.primary,
   },
   pickBtn: {
-    backgroundColor: theme.colors.accent,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: theme.radius.sm,
   },
   pickBtnText: {
