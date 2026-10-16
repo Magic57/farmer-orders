@@ -297,7 +297,9 @@ export const OrderHistoryScreen = () => {
                     onPress={() => navigation.navigate('EditOrder', { orderId: item.id })}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.customerName}>{item.customerName}</Text>
+                    <Text style={styles.customerName}>
+                      {item.orderNumber ? `#${item.orderNumber} ` : ''}{item.customerName}
+                    </Text>
                     <View style={[styles.badge, { backgroundColor: badge.bg }]}>
                       <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
                     </View>

@@ -38,15 +38,63 @@ export const DeliveryTodayScreen = () => {
   const isPicker = user?.role === 'picker';
 
   useEffect(() => {
-    const unsubscribe = StorageService.subscribeOrders(user?.farmId || '', (all) => {
-      setActiveOrders(all.filter((o) => ['assembling', 'assembled', 'in_progress'].includes(o.status)));
-      setFormedOrders(all.filter((o) => o.status === 'formed'));
+    const unsubscribe = StorageService.subscribeOrders(user?.farmId || '', async (all) => {
+      const active = all.filter((o) => ['assembling', 'assembled', 'in_progress'].includes(o.status));
+      const formed = all.filter((o) => o.status === 'formed');
+
+      // Проверяем, есть ли активные заказы без присвоенного постоянного номера
+      const unassigned = active.filter((o) => !o.orderNumber || o.orderNumber <= 0);
+      if (unassigned.length > 0) {
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const todayCompleted = all.filter(
+          (o) => (o.status === 'completed' || o.status === 'cancelled') && (o.completedAt || 0) >= startOfDay
+        );
+        let currentMax = [...active, ...todayCompleted].reduce(
+          (max, o) => Math.max(max, typeof o.orderNumber === 'number' ? o.orderNumber : 0),
+          0
+        );
+
+        const sortedUnassigned = [...unassigned].sort((a, b) => a.createdAt - b.createdAt);
+        for (const ord of sortedUnassigned) {
+          currentMax += 1;
+          ord.orderNumber = currentMax;
+          await StorageService.updateOrderStatus(ord.id, ord.status, { orderNumber: currentMax });
+        }
+      }
+
+      // Всегда сортируем активные заказы строго по их постоянному номеру orderNumber (1, 2, 3...)
+      active.sort((a, b) => (a.orderNumber || 9999) - (b.orderNumber || 9999));
+
+      setActiveOrders(active);
+      setFormedOrders(formed);
     });
     return unsubscribe;
   }, [user?.farmId]);
 
   const handlePickOrder = async (orderId: string) => {
-    await StorageService.updateOrderStatus(orderId, 'assembling');
+    await StorageService.pickOrderForDelivery(orderId, user?.farmId);
+  };
+
+  const handlePickAllFormed = async () => {
+    if (formedOrders.length === 0) return;
+    Alert.alert(
+      'Взять все заказы в сборку',
+      `Взять все сформированные заказы (${formedOrders.length} шт.) в сборку на сегодня?`,
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: `Да, взять все (${formedOrders.length})`,
+          style: 'default',
+          onPress: async () => {
+            for (const ord of formedOrders) {
+              await StorageService.pickOrderForDelivery(ord.id, user?.farmId);
+            }
+            setAddModalVisible(false);
+          },
+        },
+      ]
+    );
   };
 
   const handleAssembleOrder = (orderId: string, customerName: string) => {
@@ -110,7 +158,7 @@ export const DeliveryTodayScreen = () => {
           text: 'Вернуть',
           style: 'default',
           onPress: async () => {
-            await StorageService.updateOrderStatus(orderId, 'formed');
+            await StorageService.updateOrderStatus(orderId, 'formed', { orderNumber: null });
           },
         },
       ]
@@ -238,7 +286,7 @@ export const DeliveryTodayScreen = () => {
                 <View style={styles.driverCard}>
                   <View style={styles.driverCardHeader}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={styles.driverOrderNum}>Остановка #{index + 1}</Text>
+                      <Text style={styles.driverOrderNum}>Заказ #{item.orderNumber || (index + 1)}</Text>
                       {item.status === 'assembled' && (
                         <View style={{ backgroundColor: '#D1ECF1', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8 }}>
                           <Text style={{ fontSize: 11, fontWeight: '700', color: '#0C5460' }}>СОБРАН</Text>
@@ -329,7 +377,7 @@ export const DeliveryTodayScreen = () => {
                   activeOpacity={0.7}
                 >
                   <View style={styles.cardTop}>
-                    <Text style={styles.orderNumber}>#{index + 1} {item.customerName}</Text>
+                    <Text style={styles.orderNumber}>#{item.orderNumber || (index + 1)} {item.customerName}</Text>
                     <Text style={[styles.statusBadge, { backgroundColor: badge.bg, color: badge.color }]}>
                       {badge.label}
                     </Text>
@@ -427,10 +475,19 @@ export const DeliveryTodayScreen = () => {
       <Modal visible={addModalVisible} animationType="slide">
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Сформированные заказы</Text>
-            <TouchableOpacity onPress={() => setAddModalVisible(false)} style={styles.modalCloseBtn}>
-              <Text style={styles.modalCloseText}>Закрыть</Text>
-            </TouchableOpacity>
+            <View>
+              <Text style={styles.modalTitle}>Сформированные заказы</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              {formedOrders.length > 1 && (
+                <TouchableOpacity onPress={handlePickAllFormed} style={styles.modalPickAllBtn} activeOpacity={0.8}>
+                  <Text style={styles.modalPickAllText}>Взять все ({formedOrders.length})</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={() => setAddModalVisible(false)} style={styles.modalCloseBtn}>
+                <Text style={styles.modalCloseText}>Закрыть</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {formedOrders.length === 0 ? (
@@ -502,7 +559,6 @@ export const DeliveryTodayScreen = () => {
                       style={styles.pickBtn}
                       onPress={() => {
                         handlePickOrder(item.id);
-                        setAddModalVisible(false);
                       }}
                       activeOpacity={0.8}
                     >
@@ -800,6 +856,20 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
+    fontWeight: '700',
+    color: theme.colors.primary,
+  },
+  modalPickAllBtn: {
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: theme.radius.sm,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+  },
+  modalPickAllText: {
+    fontSize: 12,
     fontWeight: '700',
     color: theme.colors.primary,
   },

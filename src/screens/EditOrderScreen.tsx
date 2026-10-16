@@ -54,6 +54,11 @@ export const EditOrderScreen = () => {
     const data = await StorageService.getOrderById(orderId);
     if (data) {
       setOrder(data);
+      if (data.orderNumber) {
+        navigation.setOptions({ title: `Заказ #${data.orderNumber}` });
+      } else {
+        navigation.setOptions({ title: 'Детали заказа' });
+      }
       setCustomerName(data.customerName);
       setCustomerPhone(data.customerPhone);
       setDeliveryAddress(data.deliveryAddress);
@@ -232,6 +237,13 @@ export const EditOrderScreen = () => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {order?.orderNumber ? (
+        <View style={styles.orderNumberBanner}>
+          <Text style={styles.orderNumberBannerText}>Заказ #{order.orderNumber}</Text>
+          <Text style={styles.orderNumberBannerSub}>Бирка на пакет: #{order.orderNumber}</Text>
+        </View>
+      ) : null}
+
       {!isPicker && (
         <View style={styles.statusSection}>
           <Text style={styles.statusLabel}>Статус заказа:</Text>
@@ -239,8 +251,9 @@ export const EditOrderScreen = () => {
             <TouchableOpacity
               style={[styles.statusBtn, (order?.status || 'formed') === 'formed' && styles.statusBtnActiveFormed]}
               onPress={async () => {
-                await StorageService.updateOrderStatus(orderId, 'formed');
-                setOrder((prev) => prev ? { ...prev, status: 'formed' } : null);
+                await StorageService.updateOrderStatus(orderId, 'formed', { orderNumber: null });
+                setOrder((prev) => prev ? { ...prev, status: 'formed', orderNumber: undefined } : null);
+                navigation.setOptions({ title: 'Детали заказа' });
               }}
             >
               <Text style={[styles.statusBtnText, (order?.status || 'formed') === 'formed' && styles.statusBtnTextActive]}>
@@ -251,8 +264,9 @@ export const EditOrderScreen = () => {
             <TouchableOpacity
               style={[styles.statusBtn, order?.status === 'assembling' && styles.statusBtnActiveAssembling]}
               onPress={async () => {
-                await StorageService.updateOrderStatus(orderId, 'assembling');
-                setOrder((prev) => prev ? { ...prev, status: 'assembling' } : null);
+                const num = await StorageService.pickOrderForDelivery(orderId, user?.farmId);
+                setOrder((prev) => prev ? { ...prev, status: 'assembling', orderNumber: num } : null);
+                if (num) navigation.setOptions({ title: `Заказ #${num}` });
               }}
             >
               <Text style={[styles.statusBtnText, order?.status === 'assembling' && styles.statusBtnTextActive]}>
@@ -606,6 +620,31 @@ const styles = StyleSheet.create({
   deleteBtnText: {
     color: theme.colors.danger,
     fontWeight: '600',
+  },
+  orderNumberBanner: {
+    backgroundColor: '#E8F5E9',
+    borderRadius: theme.radius.sm,
+    padding: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#C8E6C9',
+  },
+  orderNumberBannerText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: theme.colors.primary,
+  },
+  orderNumberBannerSub: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#2E7D32',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
   },
   statusSection: {
     backgroundColor: theme.colors.cardBg,

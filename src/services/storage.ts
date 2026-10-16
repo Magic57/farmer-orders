@@ -8,6 +8,7 @@ import {
   where,
   getDocs,
   updateDoc,
+  deleteField,
 } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db } from './firebase';
@@ -215,7 +216,11 @@ export const StorageService = {
     return orders.find((o) => o.id === id) || null;
   },
 
-  async updateOrderStatus(id: string, status: Order['status']): Promise<void> {
+  async updateOrderStatus(
+    id: string,
+    status: Order['status'],
+    extra?: { orderNumber?: number | null }
+  ): Promise<void> {
     try {
       const orders = await this.getOrders();
       const index = orders.findIndex((o) => o.id === id);
@@ -224,6 +229,13 @@ export const StorageService = {
         if (status === 'completed' || status === 'cancelled') {
           orders[index].completedAt = Date.now();
         }
+        if (extra && extra.orderNumber !== undefined) {
+          if (extra.orderNumber === null) {
+            delete orders[index].orderNumber;
+          } else {
+            orders[index].orderNumber = extra.orderNumber;
+          }
+        }
         await AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
       }
 
@@ -231,11 +243,55 @@ export const StorageService = {
       if (status === 'completed' || status === 'cancelled') {
         updates.completedAt = Date.now();
       }
+      if (extra && extra.orderNumber !== undefined) {
+        updates.orderNumber = extra.orderNumber === null ? deleteField() : extra.orderNumber;
+      }
       await updateDoc(doc(db, 'orders', id), updates).catch((err) => {
         console.warn('Статус заказа обновлен локально (оффлайн):', err);
       });
     } catch (e) {
       console.error(e);
+    }
+  },
+
+  // Взять заказ в сборку/развозку на сегодня с присвоением постоянного номера (#1, #2, #3...)
+  async pickOrderForDelivery(id: string, farmId?: string): Promise<number> {
+    try {
+      const orders = await this.getOrders();
+      const target = orders.find((o) => o.id === id);
+      if (!target) return 0;
+
+      // Если номер уже был присвоен ранее, сохраняем его
+      if (typeof target.orderNumber === 'number' && target.orderNumber > 0) {
+        await this.updateOrderStatus(id, 'assembling');
+        return target.orderNumber;
+      }
+
+      // Вычисляем заказы на сегодняшний день (активные + завершенные/отмененные сегодня)
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+      const targetFarmId = farmId || target.farmId;
+      const farmOrders = targetFarmId ? orders.filter((o) => o.farmId === targetFarmId) : orders;
+
+      const todayOrders = farmOrders.filter((o) => {
+        if (['assembling', 'assembled', 'in_progress'].includes(o.status)) return true;
+        if ((o.status === 'completed' || o.status === 'cancelled') && (o.completedAt || 0) >= startOfDay) return true;
+        return false;
+      });
+
+      const maxNumber = todayOrders.reduce((max, o) => {
+        const num = typeof o.orderNumber === 'number' ? o.orderNumber : 0;
+        return num > max ? num : max;
+      }, 0);
+
+      const assignedNumber = maxNumber + 1;
+      await this.updateOrderStatus(id, 'assembling', { orderNumber: assignedNumber });
+      return assignedNumber;
+    } catch (e) {
+      console.error('Ошибка назначения номера заказа:', e);
+      await this.updateOrderStatus(id, 'assembling');
+      return 0;
     }
   },
 
@@ -271,6 +327,7 @@ export const StorageService = {
       if (order.deliveryDate) orderToSave.deliveryDate = order.deliveryDate;
       if (order.comment) orderToSave.comment = order.comment;
       if (order.completedAt) orderToSave.completedAt = order.completedAt;
+      if (order.orderNumber !== undefined && order.orderNumber !== null) orderToSave.orderNumber = order.orderNumber;
 
       // Локальный кеш сохраняем сразу
       const orders = await this.getOrders();

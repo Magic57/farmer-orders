@@ -57,6 +57,7 @@ export interface Order {
   createdAt: number;
   completedAt?: number;
   farmId?: string;
+  orderNumber?: number; // Порядковый номер заказа на день развозки (#1, #2, #3...)
 }
 
 export interface Customer {
