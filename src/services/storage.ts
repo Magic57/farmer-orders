@@ -332,6 +332,15 @@ export const StorageService = {
       // Локальный кеш сохраняем сразу
       const orders = await this.getOrders();
       const index = orders.findIndex((o) => o.id === order.id);
+      const existing = index >= 0 ? orders[index] : null;
+
+      if ((orderToSave.orderNumber === undefined || orderToSave.orderNumber === null) && existing?.orderNumber) {
+        orderToSave.orderNumber = existing.orderNumber;
+      }
+      if (!orderToSave.completedAt && existing?.completedAt) {
+        orderToSave.completedAt = existing.completedAt;
+      }
+
       if (index >= 0) {
         orders[index] = orderToSave;
       } else {
@@ -341,7 +350,7 @@ export const StorageService = {
 
       // Синхронизация с Firestore
       if (targetFarmId) {
-        await setDoc(doc(db, 'orders', order.id), orderToSave).catch((err) => {
+        await setDoc(doc(db, 'orders', order.id), orderToSave, { merge: true }).catch((err) => {
           console.warn('Заказ сохранен локально, синхронизация с облаком отложена (оффлайн):', err);
         });
       }

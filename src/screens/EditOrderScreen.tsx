@@ -184,6 +184,7 @@ export const EditOrderScreen = () => {
       }
 
       const updatedOrder: Order = {
+        ...order,
         id: orderId,
         customerName: isPicker ? (order?.customerName || customerName) : customerName.trim(),
         customerPhone: isPicker ? (order?.customerPhone || customerPhone) : customerPhone.trim(),
@@ -193,8 +194,10 @@ export const EditOrderScreen = () => {
         items,
         totalAmount: parseFloat(totalOrderAmount.toFixed(2)),
         status: order?.status || 'formed',
-        farmId: user?.farmId || '',
+        farmId: user?.farmId || order?.farmId || '',
         createdAt: order?.createdAt || Date.now(),
+        orderNumber: order?.orderNumber,
+        completedAt: order?.completedAt,
       };
 
       await StorageService.saveOrder(updatedOrder, user?.farmId);
