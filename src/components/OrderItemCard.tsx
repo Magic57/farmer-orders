@@ -115,7 +115,7 @@ export const OrderItemCard: React.FC<Props> = ({
         {/* Блок со счетчиком количества штук и кнопками [-] и [+] */}
         <View style={styles.counterBlock}>
           <Text style={styles.inputLabel}>
-            {isKgProduct ? 'Кол-во:' : 'Кол-во:'}
+            {isKgProduct ? 'Кол-во штук:' : 'Количество:'}
           </Text>
 
           <View style={styles.stepper}>
@@ -145,22 +145,8 @@ export const OrderItemCard: React.FC<Props> = ({
           </View>
         </View>
 
-        {/* Для весовых товаров: ввод фактического веса */}
-        {isKgProduct && showWeightInput && (
-          <View style={styles.weightBlock}>
-            <Text style={styles.inputLabel}>Вес (кг):</Text>
-            <TextInput
-              style={[styles.input, styles.inputKg]}
-              keyboardType="decimal-pad"
-              value={weightText}
-              onChangeText={handleWeightChange}
-              placeholder="0.000"
-            />
-          </View>
-        )}
-
         <View style={styles.totalBlock}>
-          <Text style={styles.totalLabel}>Итого:</Text>
+          <Text style={styles.totalLabel}>Сумма:</Text>
           <Text style={styles.totalValue}>
             {isKgProduct && (!item.actualWeight || item.actualWeight === 0)
               ? 'до взвеш.'
@@ -168,6 +154,50 @@ export const OrderItemCard: React.FC<Props> = ({
           </Text>
         </View>
       </View>
+
+      {/* Для весовых товаров: крупный, яркий блок ввода фактического веса товара */}
+      {isKgProduct && showWeightInput && (
+        <View
+          style={[
+            styles.weightSection,
+            (!item.actualWeight || item.actualWeight === 0)
+              ? styles.weightSectionPending
+              : styles.weightSectionDone,
+          ]}
+        >
+          <View style={styles.weightHeaderRow}>
+            <Text style={styles.weightSectionTitle}>⚖️ ВВЕДИТЕ ВЕС ТОВАРА:</Text>
+            {item.actualWeight && item.actualWeight > 0 ? (
+              <View style={styles.weightBadgeDone}>
+                <Text style={styles.weightBadgeDoneText}>✓ Взвешено</Text>
+              </View>
+            ) : (
+              <View style={styles.weightBadgePending}>
+                <Text style={styles.weightBadgePendingText}>Ждет взвешивания</Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.weightInputRow}>
+            <TextInput
+              style={styles.weightInputBig}
+              keyboardType="decimal-pad"
+              value={weightText}
+              onChangeText={handleWeightChange}
+              placeholder="0.000"
+              placeholderTextColor="#888888"
+              selectTextOnFocus
+            />
+            <Text style={styles.weightUnitBig}>кг</Text>
+          </View>
+
+          <Text style={styles.weightHintText}>
+            {item.actualWeight && item.actualWeight > 0
+              ? `Рассчитано: ${item.actualWeight} кг × ${item.pricePerUnit} ₽ = ${item.totalPrice.toFixed(2)} ₽`
+              : 'Введите точный вес с весов в килограммах (например: 1.45)'}
+          </Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -217,10 +247,10 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   inputLabel: {
-    fontSize: 13,
+    fontSize: 14,
     color: theme.colors.textMain,
-    marginRight: 6,
-    fontWeight: '500',
+    marginRight: 8,
+    fontWeight: '600',
   },
   stepper: {
     flexDirection: 'row',
@@ -232,58 +262,118 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   stepBtn: {
-    width: 32,
-    height: 32,
+    width: 38,
+    height: 38,
     backgroundColor: '#ECE7DE',
     justifyContent: 'center',
     alignItems: 'center',
   },
   stepBtnText: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: theme.colors.primary,
   },
   stepInput: {
-    width: 42,
-    height: 32,
+    width: 48,
+    height: 38,
     textAlign: 'center',
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     color: theme.colors.textMain,
     paddingVertical: 0,
-  },
-  weightBlock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 6,
-    marginVertical: 4,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.sm,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    width: 60,
-    textAlign: 'center',
-    fontSize: 14,
-    backgroundColor: '#FAF8F5',
-  },
-  inputKg: {
-    width: 82,
-    height: 32,
   },
   totalBlock: {
     alignItems: 'flex-end',
     marginVertical: 4,
   },
   totalLabel: {
-    fontSize: 11,
+    fontSize: 12,
     color: theme.colors.textMuted,
   },
   totalValue: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     color: theme.colors.primary,
+  },
+  // Крупный блок ввода веса товара
+  weightSection: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: theme.radius.md,
+    borderWidth: 2,
+  },
+  weightSectionPending: {
+    backgroundColor: '#FFFDE7', // Теплый мягкий желтый цвет для привлечения внимания
+    borderColor: '#FBC02D',
+  },
+  weightSectionDone: {
+    backgroundColor: '#F1F8E9', // Мягкий зеленый при заполненном весе
+    borderColor: '#4CAF50',
+  },
+  weightHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  weightSectionTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#333333',
+    letterSpacing: 0.5,
+  },
+  weightBadgePending: {
+    backgroundColor: '#FFE082',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  weightBadgePendingText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#7F4F00',
+  },
+  weightBadgeDone: {
+    backgroundColor: '#C8E6C9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  weightBadgeDoneText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1B5E20',
+  },
+  weightInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+    paddingHorizontal: 16,
+    height: 56,
+  },
+  weightInputBig: {
+    flex: 1,
+    fontSize: 26,
+    fontWeight: '800',
+    color: theme.colors.textMain,
+    textAlign: 'center',
+    height: 54,
+  },
+  weightUnitBig: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: theme.colors.primary,
+    marginLeft: 8,
+  },
+  weightHintText: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
+    marginTop: 6,
+    fontWeight: '500',
   },
 });
