@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserProfile, UserRole } from '../types';
 import { AuthService } from '../services/authService';
+import { auth } from '../services/firebase';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -36,27 +37,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
+    // Страховочный таймер: если сеть медленная или Firebase задерживается при первом запуске,
+    // через 2.5 секунды гарантированно убираем индикатор загрузки и показываем форму авторизации
+    const fallbackTimer = setTimeout(() => {
+      if (isMounted) {
+        setLoading(false);
+      }
+    }, 2500);
+
     const unsubscribe = AuthService.subscribeAuth(async (firebaseUser) => {
-      if (firebaseUser) {
-        const profile = await AuthService.getUserProfile(firebaseUser.uid);
-        if (isMounted) {
-          if (profile) {
-            setUser(profile);
-            setIsDriverMode(profile.role === 'courier');
+      try {
+        if (firebaseUser) {
+          const profile = await AuthService.getUserProfile(firebaseUser.uid);
+          if (isMounted) {
+            if (profile) {
+              setUser(profile);
+              setIsDriverMode(profile.role === 'courier');
+            }
+            setLoading(false);
           }
-          setLoading(false);
+        } else {
+          // Если firebaseUser === null, проверяем есть ли текущий пользователь в auth или кеш
+          const currentCached = await AuthService.getCachedProfile();
+          if (isMounted) {
+            if (currentCached && auth?.currentUser) {
+              setUser(currentCached);
+              setIsDriverMode(currentCached.role === 'courier');
+            } else if (!auth?.currentUser) {
+              setUser(null);
+              setIsDriverMode(false);
+            }
+            setLoading(false);
+          }
         }
-      } else {
-        // Если firebaseUser === null, проверяем есть ли текущий пользователь в auth или кеш
-        const currentCached = await AuthService.getCachedProfile();
+      } catch (e) {
+        console.warn('Ошибка проверки авторизации:', e);
         if (isMounted) {
-          if (currentCached && auth.currentUser) {
-            setUser(currentCached);
-            setIsDriverMode(currentCached.role === 'courier');
-          } else if (!auth.currentUser) {
-            setUser(null);
-            setIsDriverMode(false);
-          }
           setLoading(false);
         }
       }
@@ -64,6 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       isMounted = false;
+      clearTimeout(fallbackTimer);
       unsubscribe();
     };
   }, []);
