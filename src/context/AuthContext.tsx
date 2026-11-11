@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserProfile, UserRole } from '../types';
 import { AuthService } from '../services/authService';
 import { auth } from '../services/firebase';
+import { NotificationService } from '../services/notificationService';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -53,6 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (profile) {
               setUser(profile);
               setIsDriverMode(profile.role === 'courier');
+              NotificationService.registerForPushNotificationsAsync(profile.uid);
             }
             setLoading(false);
           }
@@ -88,6 +90,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, pass: string) => {
     const profile = await AuthService.login(email, pass);
     setUser(profile);
+    if (profile?.uid) {
+      NotificationService.registerForPushNotificationsAsync(profile.uid);
+    }
   };
 
   const registerNewFarm = async (
@@ -99,6 +104,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ) => {
     const profile = await AuthService.registerWithNewFarm(email, pass, name, farmName, role);
     setUser(profile);
+    if (profile?.uid) {
+      NotificationService.registerForPushNotificationsAsync(profile.uid);
+    }
   };
 
   const registerJoinFarm = async (
@@ -110,6 +118,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ) => {
     const profile = await AuthService.registerJoinFarm(email, pass, name, inviteCode, role);
     setUser(profile);
+    if (profile?.uid) {
+      NotificationService.registerForPushNotificationsAsync(profile.uid);
+    }
   };
 
   const logout = async () => {

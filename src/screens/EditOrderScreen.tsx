@@ -11,6 +11,7 @@ import {
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { Order, OrderItem, Product, Customer } from '../types';
 import { StorageService } from '../services/storage';
+import { NotificationService } from '../services/notificationService';
 import { OrderItemCard } from '../components/OrderItemCard';
 import { SelectProductModal } from '../components/SelectProductModal';
 import { SelectCustomerModal } from '../components/SelectCustomerModal';
@@ -270,6 +271,14 @@ export const EditOrderScreen = () => {
                 const num = await StorageService.pickOrderForDelivery(orderId, user?.farmId);
                 setOrder((prev) => prev ? { ...prev, status: 'assembling', orderNumber: num } : null);
                 if (num) navigation.setOptions({ title: `Заказ #${num}` });
+                if (user?.farmId && order) {
+                  NotificationService.notifyPickersOnAssembly(
+                    user.farmId,
+                    num || order.orderNumber || '',
+                    order.customerName,
+                    order.items.length
+                  );
+                }
               }}
             >
               <Text style={[styles.statusBtnText, order?.status === 'assembling' && styles.statusBtnTextActive]}>
@@ -282,6 +291,13 @@ export const EditOrderScreen = () => {
               onPress={async () => {
                 await StorageService.updateOrderStatus(orderId, 'assembled');
                 setOrder((prev) => prev ? { ...prev, status: 'assembled' } : null);
+                if (user?.farmId && order) {
+                  NotificationService.notifyDispatchersAndCouriersOnAssembled(
+                    user.farmId,
+                    order.orderNumber || '',
+                    order.customerName
+                  );
+                }
               }}
             >
               <Text style={[styles.statusBtnText, order?.status === 'assembled' && styles.statusBtnTextActive]}>

@@ -12,6 +12,7 @@ export interface UserProfile {
   farmId: string; // ID хозяйства
   farmName: string;
   inviteCode: string; // Код приглашения в хозяйство
+  pushToken?: string; // Токен для Push-уведомлений
 }
 
 export interface Farm {

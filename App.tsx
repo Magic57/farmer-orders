@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -7,6 +7,8 @@ import { Text, View, ActivityIndicator } from 'react-native';
 
 import { RootStackParamList, MainTabParamList } from './src/types';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { StorageService } from './src/services/storage';
+import { NotificationService } from './src/services/notificationService';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { ProductsScreen } from './src/screens/ProductsScreen';
 import { EditProductScreen } from './src/screens/EditProductScreen';
@@ -99,6 +101,47 @@ function MainTabs() {
 
 function NavigationRoot() {
   const { user, loading } = useAuth();
+
+  // Фоновое и онлайн отслеживание изменений заказов для уведомлений
+  useEffect(() => {
+    if (!user?.farmId) return;
+
+    let isFirstLoad = true;
+    const knownStatuses = new Map<string, string>();
+
+    const unsub = StorageService.subscribeOrders(user.farmId, (orders) => {
+      if (isFirstLoad) {
+        orders.forEach((o) => knownStatuses.set(o.id, o.status));
+        isFirstLoad = false;
+        return;
+      }
+
+      orders.forEach((o) => {
+        const prevStatus = knownStatuses.get(o.id);
+        if (prevStatus && prevStatus !== o.status) {
+          // Заказ передан в сборку -> уведомляем сборщика
+          if (o.status === 'assembling' && user.role === 'picker') {
+            const numStr = o.orderNumber ? `#${o.orderNumber}` : '';
+            NotificationService.showLocalNotification(
+              '📦 Новый заказ на сборку!',
+              `Заказ ${numStr} (${o.customerName}) передан в сборку. Позиций: ${o.items.length}`
+            );
+          }
+          // Заказ собран сборщиком -> уведомляем диспетчера и развозчика
+          else if (o.status === 'assembled' && (user.role === 'manager' || user.role === 'courier')) {
+            const numStr = o.orderNumber ? `#${o.orderNumber}` : '';
+            NotificationService.showLocalNotification(
+              '✅ Заказ собран!',
+              `Заказ ${numStr} (${o.customerName}) собран и готов к доставке`
+            );
+          }
+        }
+        knownStatuses.set(o.id, o.status);
+      });
+    });
+
+    return () => unsub();
+  }, [user?.farmId, user?.role]);
 
   if (loading) {
     return (

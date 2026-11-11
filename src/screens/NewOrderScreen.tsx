@@ -68,7 +68,6 @@ export const NewOrderScreen = () => {
         style: 'destructive',
         onPress: async () => {
           await StorageService.deleteCustomer(id);
-          loadCustomers();
         },
       },
     ]);

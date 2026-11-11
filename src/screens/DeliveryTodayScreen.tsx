@@ -16,6 +16,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Order, RootStackParamList } from '../types';
 import { StorageService } from '../services/storage';
+import { NotificationService } from '../services/notificationService';
 import { useAuth } from '../context/AuthContext';
 import { theme } from '../constants/theme';
 
@@ -73,7 +74,17 @@ export const DeliveryTodayScreen = () => {
   }, [user?.farmId]);
 
   const handlePickOrder = async (orderId: string) => {
-    await StorageService.pickOrderForDelivery(orderId, user?.farmId);
+    const targetOrder = formedOrders.find((o) => o.id === orderId);
+    const assignedNumber = await StorageService.pickOrderForDelivery(orderId, user?.farmId);
+
+    if (user?.farmId && targetOrder) {
+      NotificationService.notifyPickersOnAssembly(
+        user.farmId,
+        assignedNumber || targetOrder.orderNumber || '',
+        targetOrder.customerName,
+        targetOrder.items.length
+      );
+    }
   };
 
   const handlePickAllFormed = async () => {
@@ -87,8 +98,18 @@ export const DeliveryTodayScreen = () => {
           text: `Да, взять все (${formedOrders.length})`,
           style: 'default',
           onPress: async () => {
+            const count = formedOrders.length;
+            const itemsCount = formedOrders.reduce((sum, o) => sum + o.items.length, 0);
             for (const ord of formedOrders) {
               await StorageService.pickOrderForDelivery(ord.id, user?.farmId);
+            }
+            if (user?.farmId) {
+              NotificationService.notifyPickersOnAssembly(
+                user.farmId,
+                'все',
+                `Все заказы (${count} шт.)`,
+                itemsCount
+              );
             }
             setAddModalVisible(false);
           },
@@ -108,6 +129,14 @@ export const DeliveryTodayScreen = () => {
           style: 'default',
           onPress: async () => {
             await StorageService.updateOrderStatus(orderId, 'assembled');
+            const targetOrder = activeOrders.find((o) => o.id === orderId);
+            if (user?.farmId) {
+              NotificationService.notifyDispatchersAndCouriersOnAssembled(
+                user.farmId,
+                targetOrder?.orderNumber || '',
+                customerName
+              );
+            }
           },
         },
       ]

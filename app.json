@@ -22,7 +22,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#2D5A27"
       },
-      "package": "com.farmer.orders"
+      "package": "com.farmer.orders",
+      "googleServicesFile": "./google-services.json"
     },
     "plugins": [
       [
@@ -30,6 +31,13 @@
         {
           "photosPermission": "Приложению необходим доступ к вашей галерее для прикрепления фото товаров.",
           "cameraPermission": "Приложению необходим доступ к камере для съемки фото товаров."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#2D5A27"
         }
       ]
     ]
