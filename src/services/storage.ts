@@ -6,6 +6,7 @@ import {
   onSnapshot,
   query,
   where,
+  getDoc,
   getDocs,
   updateDoc,
   deleteField,
@@ -17,6 +18,38 @@ import { Product, Order, Customer } from '../types';
 const PRODUCTS_KEY = '@farmer_products';
 const ORDERS_KEY = '@farmer_orders';
 const CUSTOMERS_KEY = '@farmer_customers';
+
+// Единый in-memory кеш и мультиплексор подписки на заказы,
+// чтобы не плодить дублирующие onSnapshot и не блокировать JS-поток частой сериализацией AsyncStorage
+let ordersCache: Order[] | null = null;
+let ordersCacheFarmId: string | null = null;
+const orderListeners = new Set<(orders: Order[]) => void>();
+let activeOrdersUnsub: (() => void) | null = null;
+let activeOrdersFarmId: string | null = null;
+let persistOrdersTimer: ReturnType<typeof setTimeout> | null = null;
+
+function schedulePersistOrders(list: Order[]) {
+  if (persistOrdersTimer) {
+    clearTimeout(persistOrdersTimer);
+  }
+  persistOrdersTimer = setTimeout(() => {
+    persistOrdersTimer = null;
+    AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(list)).catch((err) => {
+      console.warn('Ошибка фонового кеширования заказов:', err);
+    });
+  }, 2000);
+}
+
+function notifyOrderListeners(list: Order[]) {
+  ordersCache = list;
+  orderListeners.forEach((cb) => {
+    try {
+      cb(list);
+    } catch (e) {
+      console.error('Ошибка в обработчике подписки на заказы:', e);
+    }
+  });
+}
 
 export const StorageService = {
   // === REALTIME СИНХРОНИЗАЦИЯ ЧЕРЕЗ FIRESTORE ===
@@ -48,31 +81,69 @@ export const StorageService = {
     );
   },
 
-  // Подписка на обновление заказов в реальном времени
+  // Подписка на обновление заказов в реальном времени (единый мультиплексированный слушатель)
   subscribeOrders(farmId: string, callback: (orders: Order[]) => void) {
-    // Сначала сразу отдаем локальный кеш
-    this.getOrders().then(callback);
-
     if (!farmId) {
+      this.getOrders().then(callback);
       return () => {};
     }
 
-    const q = query(collection(db, 'orders'), where('farmId', '==', farmId));
-    return onSnapshot(
-      q,
-      (snap) => {
-        const list: Order[] = [];
-        snap.forEach((d) => list.push(d.data() as Order));
-        list.sort((a, b) => b.createdAt - a.createdAt);
-        // Кешируем локально
-        AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(list));
-        callback(list);
-      },
-      (err) => {
-        console.warn('Оффлайн-режим подписки на заказы:', err);
-        this.getOrders().then(callback);
+    // Если сменилось хозяйство — сбрасываем кеш
+    if (ordersCacheFarmId !== farmId) {
+      ordersCache = null;
+      ordersCacheFarmId = farmId;
+    }
+
+    // Сразу отдаем данные из памяти (мгновенно) или из локального кеша при холодном старте
+    if (ordersCache !== null) {
+      callback(ordersCache);
+    } else {
+      this.getOrders().then((cached) => {
+        if (ordersCache === null) {
+          ordersCache = cached;
+        }
+        callback(ordersCache);
+      });
+    }
+
+    orderListeners.add(callback);
+
+    // Запускаем ровно один onSnapshot на всё приложение для данного farmId
+    if (!activeOrdersUnsub || activeOrdersFarmId !== farmId) {
+      if (activeOrdersUnsub) {
+        activeOrdersUnsub();
+        activeOrdersUnsub = null;
       }
-    );
+      activeOrdersFarmId = farmId;
+      const q = query(collection(db, 'orders'), where('farmId', '==', farmId));
+      activeOrdersUnsub = onSnapshot(
+        q,
+        (snap) => {
+          const list: Order[] = [];
+          snap.forEach((d) => list.push(d.data() as Order));
+          list.sort((a, b) => b.createdAt - a.createdAt);
+          notifyOrderListeners(list);
+          schedulePersistOrders(list);
+        },
+        (err) => {
+          console.warn('Оффлайн-режим подписки на заказы:', err);
+          if (ordersCache !== null) {
+            notifyOrderListeners(ordersCache);
+          } else {
+            this.getOrders().then(notifyOrderListeners);
+          }
+        }
+      );
+    }
+
+    return () => {
+      orderListeners.delete(callback);
+      if (orderListeners.size === 0 && activeOrdersUnsub) {
+        activeOrdersUnsub();
+        activeOrdersUnsub = null;
+        activeOrdersFarmId = null;
+      }
+    };
   },
 
   // Подписка на клиентов в реальном времени
@@ -198,20 +269,37 @@ export const StorageService = {
 
   // === ОПЕРАЦИИ С ЗАКАЗАМИ ===
   async getOrders(): Promise<Order[]> {
+    if (ordersCache !== null) {
+      return ordersCache;
+    }
     try {
       const data = await AsyncStorage.getItem(ORDERS_KEY);
       if (!data) return [];
       const list: Order[] = JSON.parse(data);
-      return list.map((order) => ({
+      const normalized = list.map((order) => ({
         ...order,
         status: order.status || 'formed',
       }));
+      ordersCache = normalized;
+      return normalized;
     } catch (e) {
       return [];
     }
   },
 
   async getOrderById(id: string): Promise<Order | null> {
+    if (ordersCache !== null) {
+      const found = ordersCache.find((o) => o.id === id);
+      if (found) return found;
+    }
+    try {
+      const snap = await getDoc(doc(db, 'orders', id));
+      if (snap.exists()) {
+        return snap.data() as Order;
+      }
+    } catch (e) {
+      console.warn('Не удалось загрузить заказ из Firestore, пробуем локальный кеш:', e);
+    }
     const orders = await this.getOrders();
     return orders.find((o) => o.id === id) || null;
   },
@@ -222,21 +310,23 @@ export const StorageService = {
     extra?: { orderNumber?: number | null }
   ): Promise<void> {
     try {
-      const orders = await this.getOrders();
-      const index = orders.findIndex((o) => o.id === id);
+      const currentOrders = ordersCache !== null ? [...ordersCache] : [...(await this.getOrders())];
+      const index = currentOrders.findIndex((o) => o.id === id);
       if (index >= 0) {
-        orders[index].status = status;
+        const updated = { ...currentOrders[index], status };
         if (status === 'completed' || status === 'cancelled') {
-          orders[index].completedAt = Date.now();
+          updated.completedAt = Date.now();
         }
         if (extra && extra.orderNumber !== undefined) {
           if (extra.orderNumber === null) {
-            delete orders[index].orderNumber;
+            delete updated.orderNumber;
           } else {
-            orders[index].orderNumber = extra.orderNumber;
+            updated.orderNumber = extra.orderNumber;
           }
         }
-        await AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+        currentOrders[index] = updated;
+        notifyOrderListeners(currentOrders);
+        schedulePersistOrders(currentOrders);
       }
 
       const updates: any = { status };
@@ -329,10 +419,10 @@ export const StorageService = {
       if (order.completedAt) orderToSave.completedAt = order.completedAt;
       if (order.orderNumber !== undefined && order.orderNumber !== null) orderToSave.orderNumber = order.orderNumber;
 
-      // Локальный кеш сохраняем сразу
-      const orders = await this.getOrders();
-      const index = orders.findIndex((o) => o.id === order.id);
-      const existing = index >= 0 ? orders[index] : null;
+      // Локальный кеш в памяти обновляем мгновенно (без блокирующей записи в AsyncStorage)
+      const currentOrders = ordersCache !== null ? [...ordersCache] : [...(await this.getOrders())];
+      const index = currentOrders.findIndex((o) => o.id === order.id);
+      const existing = index >= 0 ? currentOrders[index] : null;
 
       if ((orderToSave.orderNumber === undefined || orderToSave.orderNumber === null) && existing?.orderNumber) {
         orderToSave.orderNumber = existing.orderNumber;
@@ -342,11 +432,12 @@ export const StorageService = {
       }
 
       if (index >= 0) {
-        orders[index] = orderToSave;
+        currentOrders[index] = orderToSave;
       } else {
-        orders.unshift(orderToSave);
+        currentOrders.unshift(orderToSave);
       }
-      await AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
+      notifyOrderListeners(currentOrders);
+      schedulePersistOrders(currentOrders);
 
       // Синхронизация с Firestore
       if (targetFarmId) {
@@ -362,9 +453,10 @@ export const StorageService = {
 
   async deleteOrder(id: string): Promise<void> {
     try {
-      const orders = await this.getOrders();
-      const filtered = orders.filter((o) => o.id !== id);
-      await AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(filtered));
+      const currentOrders = ordersCache !== null ? ordersCache : await this.getOrders();
+      const filtered = currentOrders.filter((o) => o.id !== id);
+      notifyOrderListeners(filtered);
+      schedulePersistOrders(filtered);
 
       await deleteDoc(doc(db, 'orders', id)).catch((err) => {
         console.warn('Удаление заказа выполнено локально (оффлайн):', err);
@@ -382,10 +474,11 @@ export const StorageService = {
       // Удаляем из Firestore параллельно
       await Promise.allSettled(ids.map((id) => deleteDoc(doc(db, 'orders', id))));
 
-      // Удаляем из локального AsyncStorage
-      const orders = await this.getOrders();
-      const filtered = orders.filter((o) => !idsSet.has(o.id));
-      await AsyncStorage.setItem(ORDERS_KEY, JSON.stringify(filtered));
+      // Удаляем из локального кеша
+      const currentOrders = ordersCache !== null ? ordersCache : await this.getOrders();
+      const filtered = currentOrders.filter((o) => !idsSet.has(o.id));
+      notifyOrderListeners(filtered);
+      schedulePersistOrders(filtered);
     } catch (e) {
       console.error('Ошибка массового удаления заказов:', e);
       throw e;

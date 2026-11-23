@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -37,14 +37,17 @@ export const DeliveryTodayScreen = () => {
   const setDriverMode = setIsDriverMode;
 
   const isPicker = user?.role === 'picker';
+  const autoAssignedIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    const unsubscribe = StorageService.subscribeOrders(user?.farmId || '', async (all) => {
+    const unsubscribe = StorageService.subscribeOrders(user?.farmId || '', (all) => {
       const active = all.filter((o) => ['assembling', 'assembled', 'in_progress'].includes(o.status));
       const formed = all.filter((o) => o.status === 'formed');
 
-      // Проверяем, есть ли активные заказы без присвоенного постоянного номера
-      const unassigned = active.filter((o) => !o.orderNumber || o.orderNumber <= 0);
+      // Проверяем, есть ли активные заказы без присвоенного постоянного номера (защита от повторных циклов записи)
+      const unassigned = active.filter(
+        (o) => (!o.orderNumber || o.orderNumber <= 0) && !autoAssignedIdsRef.current.has(o.id)
+      );
       if (unassigned.length > 0) {
         const now = new Date();
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -58,9 +61,9 @@ export const DeliveryTodayScreen = () => {
 
         const sortedUnassigned = [...unassigned].sort((a, b) => a.createdAt - b.createdAt);
         for (const ord of sortedUnassigned) {
+          autoAssignedIdsRef.current.add(ord.id);
           currentMax += 1;
-          ord.orderNumber = currentMax;
-          await StorageService.updateOrderStatus(ord.id, ord.status, { orderNumber: currentMax });
+          StorageService.updateOrderStatus(ord.id, ord.status, { orderNumber: currentMax });
         }
       }
 
