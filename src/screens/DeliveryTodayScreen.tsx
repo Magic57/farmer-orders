@@ -507,20 +507,19 @@ export const DeliveryTodayScreen = () => {
       <Modal visible={addModalVisible} animationType="slide">
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <View>
-              <Text style={styles.modalTitle}>Сформированные заказы</Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              {formedOrders.length > 1 && (
-                <TouchableOpacity onPress={handlePickAllFormed} style={styles.modalPickAllBtn} activeOpacity={0.8}>
-                  <Text style={styles.modalPickAllText}>Взять все ({formedOrders.length})</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity onPress={() => setAddModalVisible(false)} style={styles.modalCloseBtn}>
-                <Text style={styles.modalCloseText}>Закрыть</Text>
+            <Text style={styles.modalTitle} numberOfLines={1}>Сформированные заказы</Text>
+            <TouchableOpacity onPress={() => setAddModalVisible(false)} style={styles.modalCloseBtn}>
+              <Text style={styles.modalCloseText}>Закрыть</Text>
+            </TouchableOpacity>
+          </View>
+
+          {formedOrders.length > 1 && (
+            <View style={styles.modalSubHeader}>
+              <TouchableOpacity onPress={handlePickAllFormed} style={styles.modalPickAllBtn} activeOpacity={0.8}>
+                <Text style={styles.modalPickAllText}>📦 Взять все в сборку ({formedOrders.length})</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          )}
 
           {formedOrders.length === 0 ? (
             <View style={styles.modalEmpty}>
@@ -887,26 +886,37 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.cardBg,
   },
   modalTitle: {
+    flex: 1,
+    marginRight: 8,
     fontSize: 18,
     fontWeight: '700',
     color: theme.colors.primary,
   },
+  modalSubHeader: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 10,
+    backgroundColor: theme.colors.cardBg,
+    borderBottomWidth: 1,
+    borderColor: theme.colors.border,
+  },
   modalPickAllBtn: {
     backgroundColor: '#E8F5E9',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderRadius: theme.radius.sm,
-    marginRight: 8,
     borderWidth: 1,
     borderColor: theme.colors.primary,
+    alignItems: 'center',
   },
   modalPickAllText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     color: theme.colors.primary,
   },
   modalCloseBtn: {
-    padding: 6,
+    flexShrink: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   modalCloseText: {
     color: theme.colors.primary,
